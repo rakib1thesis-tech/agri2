@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
@@ -13,7 +12,6 @@ import Sensors from './pages/Dashboard/Sensors';
 import Management from './pages/Dashboard/Management';
 import FeaturesPublic from './pages/FeaturesPublic';
 import HowItWorks from './pages/HowItWorks';
-import DeploymentGuide from './pages/DeploymentGuide';
 
 import { User } from './types';
 
@@ -41,7 +39,6 @@ const App: React.FC = () => {
       case 'how-it-works': return <HowItWorks />;
       case 'public-dashboard': return <PublicDashboard />;
       case 'pricing': return <Pricing />;
-      case 'deployment': return <DeploymentGuide />;
       case 'login': return <Login onLogin={handleLogin} onSwitchToSignup={() => setActiveTab('signup')} />;
       case 'signup': return <Signup onSignup={handleLogin} onSwitchToLogin={() => setActiveTab('login')} />;
       
