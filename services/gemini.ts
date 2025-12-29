@@ -84,3 +84,46 @@ export const getSoilHealthSummary = async (field: Field, latestData: SensorData)
     return "Unable to generate AI soil insight at this moment.";
   }
 };
+
+export const getDetailedManagementPlan = async (field: Field, latestData: SensorData) => {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) return null;
+
+  const ai = new GoogleGenAI({ apiKey });
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `
+        Create a detailed farm management plan based on these soil conditions in Bangladesh:
+        Field: ${field.field_name}, Location: ${field.location}
+        Soil: ${field.soil_type}
+        Temp: ${latestData.temperature}°C, Moisture: ${latestData.moisture}%, pH: ${latestData.ph_level}
+        NPK: N=${latestData.npk_n}, P=${latestData.npk_p}, K=${latestData.npk_k}
+        
+        Generate exactly 4 prioritized tasks.
+      `,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              priority: { type: Type.STRING, description: "High, Medium, or Low" },
+              title: { type: Type.STRING },
+              description: { type: Type.STRING },
+              icon: { type: Type.STRING, description: "FontAwesome icon class" }
+            },
+            required: ["priority", "title", "description", "icon"]
+          }
+        }
+      }
+    });
+    
+    return JSON.parse(response.text || '[]');
+  } catch (error) {
+    console.error("Gemini Plan Error:", error);
+    return null;
+  }
+};
