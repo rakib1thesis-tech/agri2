@@ -35,9 +35,6 @@ const Footer: React.FC<{ onNavigate: (tab: string) => void }> = ({ onNavigate })
       
       <div className="max-w-7xl mx-auto pt-8 mt-8 border-t border-slate-800 text-center text-xs text-slate-500 flex flex-col md:flex-row justify-between items-center gap-4">
         <p>&copy; {new Date().getFullYear()} Agricare Inc. All rights reserved.</p>
-        <p>
-          Developed by <a href="https://www.facebook.com/shakkhor.paul" target="_blank" rel="noopener noreferrer" className="text-emerald-500 hover:underline">Shakkhor Paul</a>
-        </p>
       </div>
     </footer>
   );

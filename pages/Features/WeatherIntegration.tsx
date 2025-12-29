@@ -2,13 +2,11 @@
 import React, { useState } from 'react';
 
 const WeatherIntegration: React.FC = () => {
-  const [tMax, setTMax] = useState(30);
-  const [tMin, setTMin] = useState(15);
+  const [tMax, setTMax] = useState(32);
+  const [tMin, setTMin] = useState(24);
   const [tBase, setTBase] = useState(10);
   
   const calculateGDD = () => {
-    // GDD = (Tmax + Tmin) / 2 - Tbase
-    // If temp is below base, use base
     const avg = (Math.max(tMax, tBase) + Math.max(tMin, tBase)) / 2;
     return Math.max(0, avg - tBase);
   };
@@ -19,7 +17,7 @@ const WeatherIntegration: React.FC = () => {
         <img src="https://images.unsplash.com/photo-1594398901394-4e34939a4fe0?q=80&w=1600&auto=format&fit=crop" className="absolute inset-0 w-full h-full object-cover opacity-40" alt="Stormy Sky" />
         <div className="relative z-10 max-w-2xl">
           <h1 className="text-5xl font-black text-white mb-6">Meteorological Precision</h1>
-          <p className="text-xl text-slate-300">We don't just predict rain; we calculate the thermal time accumulation for your specific crop varieties.</p>
+          <p className="text-xl text-slate-300">We don't just predict rain; we calculate the thermal time accumulation for crops like Rice and Jute varieties.</p>
         </div>
       </div>
 
@@ -27,7 +25,7 @@ const WeatherIntegration: React.FC = () => {
         <div className="bg-white p-12 rounded-[3rem] border border-slate-100 shadow-sm">
           <h2 className="text-3xl font-bold text-slate-900 mb-8">Growing Degree Days (GDD) Calculator</h2>
           <p className="text-slate-500 mb-10 leading-relaxed">
-            GDD is a mathematical model used to predict plant development stages and harvest timing based on heat accumulation.
+            GDD is used to predict Rice development stages and harvest timing based on heat accumulation in Bangladesh's climate.
           </p>
           
           <div className="space-y-8">
@@ -44,7 +42,7 @@ const WeatherIntegration: React.FC = () => {
             <div className="bg-slate-50 p-6 rounded-2xl">
               <label className="block text-sm font-bold text-slate-700 mb-4">Base Temperature for Crop (°C)</label>
               <input type="number" value={tBase} onChange={e => setTBase(Number(e.target.value))} className="w-full px-4 py-3 border rounded-xl" />
-              <p className="text-[10px] text-slate-400 mt-2 italic">Common base temps: Corn (10°C), Wheat (4°C), Soybeans (10°C)</p>
+              <p className="text-[10px] text-slate-400 mt-2 italic">Common base temps: Rice (10°C), Wheat (4°C), Jute (15°C)</p>
             </div>
           </div>
         </div>
@@ -65,7 +63,7 @@ const WeatherIntegration: React.FC = () => {
           
           <div className="mt-8 bg-slate-100 rounded-3xl p-8 flex gap-6 items-center">
             <i className="fas fa-info-circle text-emerald-600 text-3xl"></i>
-            <p className="text-sm text-slate-600 font-medium">Accumulate daily GDD values to estimate the date of maturity for your crops with 95% accuracy compared to simple calendar counting.</p>
+            <p className="text-sm text-slate-600 font-medium">Accumulate daily GDD values to estimate the date of maturity for your crops with 95% accuracy in the delta region.</p>
           </div>
         </div>
       </div>

@@ -22,6 +22,41 @@ const PublicDashboard: React.FC = () => {
   
   const latest = data[data.length - 1];
 
+  const handleExportCSV = () => {
+    // CSV Header
+    const headers = ['Timestamp', 'Temperature (°C)', 'Moisture (%)', 'pH Level', 'Conductivity (µs/cm)', 'Nitrogen (N)', 'Phosphorus (P)', 'Potassium (K)'];
+    
+    // Format rows
+    const rows = data.map(row => [
+      row.timestamp,
+      row.temperature.toFixed(2),
+      row.moisture.toFixed(2),
+      row.ph_level.toFixed(2),
+      row.conductivity.toFixed(0),
+      row.npk_n,
+      row.npk_p,
+      row.npk_k
+    ]);
+
+    // Construct CSV content
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(e => e.join(','))
+    ].join('\n');
+
+    // Create and trigger download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `agricare_data_${field.field_name.toLowerCase().replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
@@ -101,7 +136,12 @@ const PublicDashboard: React.FC = () => {
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
         <div className="p-6 border-b border-slate-100 flex justify-between items-center">
           <h3 className="text-lg font-bold text-slate-900">Historical Sensor Logs</h3>
-          <button className="text-emerald-600 text-sm font-semibold hover:underline">Export to CSV</button>
+          <button 
+            onClick={handleExportCSV}
+            className="text-emerald-600 text-sm font-semibold hover:underline flex items-center gap-2"
+          >
+            <i className="fas fa-file-csv"></i> Export to CSV
+          </button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left">

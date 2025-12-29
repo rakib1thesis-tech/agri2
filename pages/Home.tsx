@@ -1,5 +1,4 @@
-
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import CommentSection from '../components/CommentSection';
 
 interface HomeProps {
@@ -7,6 +6,39 @@ interface HomeProps {
 }
 
 const Home: React.FC<HomeProps> = ({ onGetStarted }) => {
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallModal, setShowInstallModal] = useState(false);
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      // Prevent the mini-infobar from appearing on mobile
+      e.preventDefault();
+      // Stash the event so it can be triggered later.
+      setDeferredPrompt(e);
+    };
+
+    window.addEventListener('beforeinstallprompt', handler);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handler);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      // Show the install prompt
+      deferredPrompt.prompt();
+      // Wait for the user to respond to the prompt
+      const { outcome } = await deferredPrompt.userChoice;
+      console.log(`User response to the install prompt: ${outcome}`);
+      // We've used the prompt, and can't use it again, throw it away
+      setDeferredPrompt(null);
+    } else {
+      // Fallback for browsers that don't support beforeinstallprompt (like iOS Safari)
+      setShowInstallModal(true);
+    }
+  };
+
   const features = [
     { icon: 'fa-microchip', title: 'IoT Sensor Network', desc: 'Precision sensors monitoring every inch of your soil.' },
     { icon: 'fa-chart-line', title: 'Real-time Analysis', desc: 'Watch your field health live through interactive dashboards.' },
@@ -39,13 +71,17 @@ const Home: React.FC<HomeProps> = ({ onGetStarted }) => {
               >
                 <i className="fas fa-rocket"></i> Start Free Trial
               </button>
-              <div className="bg-white/10 backdrop-blur-md px-6 py-4 rounded-2xl border border-white/20 flex items-center gap-4 text-white">
-                <i className="fas fa-mobile-screen-button text-2xl"></i>
-                <div className="text-left">
+              
+              <button 
+                onClick={handleInstallClick}
+                className="bg-white/10 backdrop-blur-md px-6 py-4 rounded-2xl border border-white/20 flex items-center gap-4 text-white hover:bg-white/20 transition-colors text-left group"
+              >
+                <i className="fas fa-mobile-screen-button text-2xl group-hover:scale-110 transition-transform"></i>
+                <div>
                   <div className="text-[10px] font-bold uppercase tracking-widest text-emerald-300">Available as PWA</div>
                   <div className="text-sm font-medium">Add to Home Screen</div>
                 </div>
-              </div>
+              </button>
             </div>
           </div>
         </div>
@@ -78,6 +114,12 @@ const Home: React.FC<HomeProps> = ({ onGetStarted }) => {
                 <i className="fas fa-check-circle"></i> Cross-Platform
               </div>
             </div>
+            <button 
+              onClick={handleInstallClick}
+              className="mt-6 px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all flex items-center gap-2"
+            >
+              <i className="fas fa-plus-circle"></i> Install Now
+            </button>
           </div>
           <div className="w-48 h-48 bg-white rounded-3xl shadow-xl border border-slate-100 flex items-center justify-center rotate-3 shrink-0">
              <i className="fas fa-cloud-arrow-down text-6xl text-emerald-500 animate-bounce"></i>
@@ -108,6 +150,48 @@ const Home: React.FC<HomeProps> = ({ onGetStarted }) => {
 
       {/* Comment Section */}
       <CommentSection />
+
+      {/* Install Modal (Fallback) */}
+      {showInstallModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl w-full max-w-md p-8 shadow-2xl animate-in zoom-in duration-200">
+            <div className="flex justify-between items-start mb-6">
+              <h2 className="text-2xl font-bold text-slate-900">Install Agricare</h2>
+              <button onClick={() => setShowInstallModal(false)} className="text-slate-400 hover:text-slate-600">
+                <i className="fas fa-times text-xl"></i>
+              </button>
+            </div>
+            
+            <div className="space-y-6 text-slate-600">
+              <p className="font-medium">To install Agricare on your home screen:</p>
+              
+              <div className="space-y-4">
+                <div className="flex gap-4 items-start">
+                  <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0 font-bold">1</div>
+                  <p className="text-sm">Open this site in your mobile browser (Safari for iOS, Chrome for Android).</p>
+                </div>
+                <div className="flex gap-4 items-start">
+                  <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0 font-bold">2</div>
+                  <p className="text-sm">
+                    Tap the <i className="fas fa-share-square text-blue-500"></i> (iOS) or <i className="fas fa-ellipsis-v"></i> (Android) button.
+                  </p>
+                </div>
+                <div className="flex gap-4 items-start">
+                  <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0 font-bold">3</div>
+                  <p className="text-sm">Select <strong>"Add to Home Screen"</strong> from the menu.</p>
+                </div>
+              </div>
+            </div>
+
+            <button 
+              onClick={() => setShowInstallModal(false)}
+              className="w-full mt-8 py-4 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all"
+            >
+              Got it!
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

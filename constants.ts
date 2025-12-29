@@ -2,9 +2,9 @@
 import { Field, SensorData, Sensor } from './types';
 
 export const MOCK_FIELDS: Field[] = [
-  { field_id: 1, user_id: '1', field_name: 'North Valley Corn', location: 'Iowa, USA', size: 50.5, soil_type: 'Loamy' },
-  { field_id: 2, user_id: '1', field_name: 'East Ridge Wheat', location: 'Kansas, USA', size: 120.0, soil_type: 'Clay' },
-  { field_id: 3, user_id: '1', field_name: 'South Orchard', location: 'California, USA', size: 35.2, soil_type: 'Sandy' },
+  { field_id: 1, user_id: '1', field_name: 'Bogura Potato Project', location: 'Bogura, Bangladesh', size: 12.5, soil_type: 'Loamy' },
+  { field_id: 2, user_id: '1', field_name: 'Rajshahi Mango Orchard', location: 'Rajshahi, Bangladesh', size: 45.0, soil_type: 'Alluvial' },
+  { field_id: 3, user_id: '1', field_name: 'Mymensingh Paddy Field', location: 'Mymensingh, Bangladesh', size: 8.2, soil_type: 'Clay' },
 ];
 
 export const generateMockSensorData = (fieldId: number): SensorData[] => {
@@ -16,13 +16,13 @@ export const generateMockSensorData = (fieldId: number): SensorData[] => {
     data.push({
       data_id: Math.random(),
       field_id: fieldId,
-      temperature: 20 + Math.random() * 10,
-      moisture: 30 + Math.random() * 40,
-      ph_level: 6.0 + Math.random() * 1.5,
-      conductivity: 500 + Math.random() * 300,
-      npk_n: 40 + Math.random() * 20,
-      npk_p: 30 + Math.random() * 15,
-      npk_k: 50 + Math.random() * 25,
+      temperature: 24 + Math.random() * 8,
+      moisture: 40 + Math.random() * 30,
+      ph_level: 5.5 + Math.random() * 1.5,
+      conductivity: 400 + Math.random() * 400,
+      npk_n: 35 + Math.random() * 25,
+      npk_p: 25 + Math.random() * 20,
+      npk_k: 45 + Math.random() * 30,
       timestamp: date.toISOString().split('T')[0],
     });
   }

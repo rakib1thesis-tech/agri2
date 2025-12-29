@@ -16,7 +16,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onSwitchToSignup }) => {
     // Simulate auth
     onLogin({
       id: '1',
-      name: 'Farmer John',
+      name: 'Kamal Hossain',
       email: email,
       subscriptionPlan: 'premium',
       subscriptionEnd: '2025-12-31'
@@ -30,8 +30,8 @@ const Login: React.FC<LoginProps> = ({ onLogin, onSwitchToSignup }) => {
           <div className="w-16 h-16 bg-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-100">
             <i className="fas fa-leaf text-white text-2xl"></i>
           </div>
-          <h2 className="text-3xl font-extrabold text-slate-900">Welcome Back</h2>
-          <p className="mt-2 text-sm text-slate-500">Sign in to manage your fields</p>
+          <h2 className="text-3xl font-extrabold text-slate-900">স্বাগতম (Welcome Back)</h2>
+          <p className="mt-2 text-sm text-slate-500">Sign in to manage your fields in Bangladesh</p>
         </div>
         
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
@@ -42,7 +42,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onSwitchToSignup }) => {
                 type="email"
                 required
                 className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-xl shadow-sm placeholder-slate-400 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
-                placeholder="you@farm.com"
+                placeholder="you@farm.com.bd"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
               />

@@ -40,18 +40,68 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
     setShowForm(false);
   };
 
+  const handleExportCSV = () => {
+    if (!selectedField) return;
+
+    // Generate historical data (last 7 days) for the selected field
+    const historicalData = generateMockSensorData(selectedField.field_id);
+    
+    // CSV Header
+    const headers = ['Timestamp', 'Temperature (°C)', 'Moisture (%)', 'pH Level', 'Conductivity (µs/cm)', 'Nitrogen (N)', 'Phosphorus (P)', 'Potassium (K)'];
+    
+    // Format rows
+    const rows = historicalData.map(row => [
+      row.timestamp,
+      row.temperature.toFixed(2),
+      row.moisture.toFixed(2),
+      row.ph_level.toFixed(2),
+      row.conductivity.toFixed(0),
+      row.npk_n,
+      row.npk_p,
+      row.npk_k
+    ]);
+
+    // Construct CSV content
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(e => e.join(','))
+    ].join('\n');
+
+    // Create and trigger download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `agricare_export_${selectedField.field_name.toLowerCase().replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-2xl font-bold text-slate-900">My Fields</h1>
-        {user.subscriptionPlan === 'basic' && (
-          <button 
-            onClick={() => setShowForm(!showForm)}
-            className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-emerald-700 transition-colors"
-          >
-            <i className="fas fa-plus"></i> Manual Data Upload
-          </button>
-        )}
+        <div className="flex gap-4">
+          {selectedField && (
+            <button 
+              onClick={handleExportCSV}
+              className="bg-white text-emerald-600 border border-emerald-100 px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-emerald-50 transition-colors shadow-sm"
+            >
+              <i className="fas fa-file-csv"></i> Export Field Data
+            </button>
+          )}
+          {user.subscriptionPlan === 'basic' && (
+            <button 
+              onClick={() => setShowForm(!showForm)}
+              className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-emerald-700 transition-colors shadow-md"
+            >
+              <i className="fas fa-plus"></i> Manual Data Upload
+            </button>
+          )}
+        </div>
       </div>
 
       {showForm && (

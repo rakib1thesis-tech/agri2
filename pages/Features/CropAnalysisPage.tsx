@@ -2,13 +2,11 @@
 import React, { useState } from 'react';
 
 const CropAnalysisPage: React.FC = () => {
-  const [ph, setPh] = useState(6.5);
-  const [nitrogen, setNitrogen] = useState(100);
-  const [moisture, setMoisture] = useState(40);
+  const [ph, setPh] = useState(6.2);
+  const [nitrogen, setNitrogen] = useState(120);
+  const [moisture, setMoisture] = useState(55);
   
-  // Weights for basic suitability score
   const calculateSuitability = () => {
-    // Ideal Ph: 6.5, Ideal N: 150, Ideal M: 60
     const phScore = 100 - Math.abs(6.5 - ph) * 15;
     const nScore = Math.min(100, (nitrogen / 150) * 100);
     const mScore = Math.min(100, (moisture / 60) * 100);
@@ -22,9 +20,9 @@ const CropAnalysisPage: React.FC = () => {
           <h1 className="text-4xl font-bold text-slate-900 mb-8">AI-Powered Crop Diagnostics</h1>
           <div className="space-y-6">
             {[
-              { title: 'Genetic Potential Mapping', text: 'Our system compares soil health markers against known crop genetic requirements.' },
-              { title: 'Pathogen Risk Profiles', text: 'Predict fungal outbreaks before they visible symptoms appear using canopy humidity models.' },
-              { title: 'Harvest Window Prediction', text: 'Mathematical modeling of fruit ripeness through multi-spectral imagery.' }
+              { title: 'Genetic Potential Mapping', text: 'Our system compares soil health markers against known Rice and Jute cultivar requirements.' },
+              { title: 'Pathogen Risk Profiles', text: 'Predict fungal outbreaks common in high-humidity delta environments.' },
+              { title: 'Harvest Window Prediction', text: 'Mathematical modeling of fruit ripeness through multi-spectral imagery for mangoes and litchis.' }
             ].map((item, i) => (
               <div key={i} className="flex gap-4">
                 <div className="shrink-0 w-10 h-10 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center font-bold">{i+1}</div>
@@ -57,7 +55,7 @@ const CropAnalysisPage: React.FC = () => {
               <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -translate-y-12 translate-x-12"></div>
               <div className="text-emerald-100 text-xs font-bold uppercase tracking-widest mb-2">Field Suitability Score</div>
               <div className="text-7xl font-black">{calculateSuitability()}%</div>
-              <div className="mt-4 text-sm font-medium">Optimal for: Corn / Grains</div>
+              <div className="mt-4 text-sm font-medium">Optimal for: Rice / Lentils</div>
             </div>
           </div>
         </div>

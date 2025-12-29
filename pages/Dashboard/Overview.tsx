@@ -6,9 +6,9 @@ import { MOCK_FIELDS, generateMockSensorData } from '../../constants';
 const Overview: React.FC<{ user: User }> = ({ user }) => {
   const latestFields = MOCK_FIELDS.slice(0, 2);
   const alerts = [
-    { type: 'warning', text: 'Low moisture detected in North Valley Corn.', time: '2h ago' },
+    { type: 'warning', text: 'Low moisture detected in Bogura Potato Project.', time: '2h ago' },
     { type: 'info', text: 'Weekly soil health report ready for review.', time: '5h ago' },
-    { type: 'danger', text: 'Sensor #104 (South Orchard) offline.', time: '1d ago' },
+    { type: 'danger', text: 'Sensor #104 (Mymensingh Paddy Field) offline.', time: '1d ago' },
   ];
 
   return (
@@ -82,11 +82,11 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
           <div className="bg-emerald-900 text-white p-6 rounded-2xl shadow-lg">
             <h3 className="font-bold mb-4 flex items-center gap-2">
               <i className="fas fa-cloud-bolt text-emerald-400"></i>
-              Weather Alert
+              Weather Alert (Bangladesh)
             </h3>
             <div className="p-4 bg-white/10 rounded-xl backdrop-blur-sm border border-white/10 mb-4">
-              <div className="text-sm font-bold mb-1">Heavy Rain Predicted</div>
-              <div className="text-xs text-emerald-200">Expect 25mm in next 12h. Consider delaying irrigation schedules.</div>
+              <div className="text-sm font-bold mb-1">Monsoon Rain Predicted</div>
+              <div className="text-xs text-emerald-200">Expect heavy rainfall in the next 12h across North-West regions. Consider delaying irrigation.</div>
             </div>
             <button className="w-full py-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg text-sm font-bold transition-colors">
               Update Schedules

@@ -11,8 +11,8 @@ interface Comment {
 
 const CommentSection: React.FC = () => {
   const [comments, setComments] = useState<Comment[]>([
-    { id: 1, name: "David Sterling", rating: 5, text: "The management alerts are a game changer. I knew exactly when to irrigate my corn field.", date: "2 days ago" },
-    { id: 2, name: "Maria Gonzalez", rating: 4, text: "Great tool for fertilizer calculation. Saved me a lot of money on over-fertilizing.", date: "1 week ago" }
+    { id: 1, name: "Abdur Rashid", rating: 5, text: "The management alerts are a game changer. I knew exactly when to irrigate my Bogura potato field.", date: "2 days ago" },
+    { id: 2, name: "Fatema Begum", rating: 4, text: "Great tool for fertilizer calculation. Saved me a lot of money on over-fertilizing during the rainy season.", date: "1 week ago" }
   ]);
   const [newComment, setNewComment] = useState("");
   const [rating, setRating] = useState(5);
@@ -55,7 +55,7 @@ const CommentSection: React.FC = () => {
                   value={userName}
                   onChange={(e) => setUserName(e.target.value)}
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none" 
-                  placeholder="e.g. John Farmer"
+                  placeholder="e.g. Kamal Hossain"
                 />
               </div>
               <div>
@@ -81,7 +81,7 @@ const CommentSection: React.FC = () => {
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
-                placeholder="How has Agricare helped your farm?"
+                placeholder="How has Agricare helped your farm in Bangladesh?"
               ></textarea>
             </div>
             <button type="submit" className="bg-emerald-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100">

@@ -5,7 +5,7 @@ const Pricing: React.FC = () => {
   const plans = [
     {
       name: 'Basic',
-      price: '$15',
+      price: '৳1,500',
       desc: 'Perfect for small hobby farms and greenhouses.',
       features: [
         'Up to 3 Fields Monitoring',
@@ -19,7 +19,7 @@ const Pricing: React.FC = () => {
     },
     {
       name: 'Premium',
-      price: '$50',
+      price: '৳5,000',
       desc: 'Ideal for professional commercial agricultural operations.',
       features: [
         'Unlimited Fields',
@@ -51,16 +51,16 @@ const Pricing: React.FC = () => {
   ];
 
   const reviews = [
-    { name: 'Michael Chen', role: 'Vineyard Owner', rating: 5, text: 'Agricare saved my crop during the heatwave last August. The moisture alerts were spot on.' },
-    { name: 'Sarah Jenkins', role: 'Organic Farmer', rating: 5, text: 'The NPK analysis feature changed the way I fertilize. My yields are up 15% this year.' },
-    { name: 'Robert Miller', role: 'Agro-Consultant', rating: 4, text: 'Great interface. The AI recommendations provide a solid baseline for multi-crop rotation.' }
+    { name: 'Anisur Rahman', role: 'Tea Garden Owner, Sylhet', rating: 5, text: 'Agricare has been revolutionary for my tea estate. The real-time NPK tracking ensures the highest quality leaves.' },
+    { name: 'Nusrat Jahan', role: 'Vegetable Farmer, Narsingdi', rating: 5, text: 'The NPK analysis feature changed the way I fertilize. My yields are up 15% this year.' },
+    { name: 'Dr. Shafiqul Islam', role: 'Agri-Scientist, BARI', rating: 4, text: 'Great interface. The AI recommendations provide a solid baseline for multi-crop rotation in the delta region.' }
   ];
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
       <div className="text-center mb-16">
         <h1 className="text-4xl font-extrabold text-slate-900 mb-4">Simple, Transparent Pricing</h1>
-        <p className="text-xl text-slate-500">Choose the plan that fits your farm's scale.</p>
+        <p className="text-xl text-slate-500">Choose the plan that fits your farm's scale in Bangladesh.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-24">
@@ -95,7 +95,7 @@ const Pricing: React.FC = () => {
       </div>
 
       <div className="border-t border-slate-200 pt-20">
-        <h2 className="text-3xl font-bold text-center text-slate-900 mb-12">Trusted by Farmers Worldwide</h2>
+        <h2 className="text-3xl font-bold text-center text-slate-900 mb-12">Trusted by Farmers Across the Delta</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {reviews.map((rev, i) => (
             <div key={i} className="bg-white p-8 rounded-2xl border border-slate-100 shadow-sm italic">
