@@ -33,6 +33,65 @@ const Management: React.FC = () => {
     return needs;
   };
 
+  const handleDownloadReport = () => {
+    const now = new Date();
+    const dateStr = now.toLocaleDateString() + ' ' + now.toLocaleTimeString();
+    
+    let reportContent = `AGRICARE - COMPREHENSIVE FARM MANAGEMENT REPORT\n`;
+    reportContent += `Generated on: ${dateStr}\n`;
+    reportContent += `============================================================\n\n`;
+
+    fieldData.forEach(({ field, data }) => {
+      const waterNeed = getWaterPrescription(data.moisture, field.size);
+      const fertNeeds = getFertilizerPrescription(data.npk_n, data.npk_p, data.npk_k);
+
+      reportContent += `FIELD: ${field.field_name}\n`;
+      reportContent += `Location: ${field.location}\n`;
+      reportContent += `Size: ${field.size} acres | Soil: ${field.soil_type}\n`;
+      reportContent += `------------------------------------------------------------\n`;
+      reportContent += `CURRENT SENSOR READINGS:\n`;
+      reportContent += `- Temperature: ${data.temperature.toFixed(1)}°C\n`;
+      reportContent += `- Moisture: ${data.moisture.toFixed(1)}%\n`;
+      reportContent += `- pH Level: ${data.ph_level.toFixed(1)}\n`;
+      reportContent += `- Nutrient Profile (NPK): ${data.npk_n.toFixed(0)}-${data.npk_p.toFixed(0)}-${data.npk_k.toFixed(0)}\n\n`;
+
+      reportContent += `PRESCRIPTIVE ACTIONS:\n`;
+      
+      // Water Prescription
+      if (waterNeed) {
+        reportContent += `[!] IRRIGATION: Required. Apply approx. ${waterNeed.toLocaleString()} Liters.\n`;
+      } else {
+        reportContent += `[✓] IRRIGATION: Not required. Soil moisture is optimal.\n`;
+      }
+
+      // Fertilizer Prescription
+      if (fertNeeds.length > 0) {
+        reportContent += `[!] FERTILIZER: Deficit detected.\n`;
+        fertNeeds.forEach(n => {
+          reportContent += `    - Add ${n.type}: +${n.deficit.toFixed(0)} kg/ha\n`;
+        });
+      } else {
+        reportContent += `[✓] FERTILIZER: All nutrient levels within target range.\n`;
+      }
+
+      reportContent += `\n============================================================\n\n`;
+    });
+
+    reportContent += `End of Report.\n`;
+
+    // Trigger Download
+    const blob = new Blob([reportContent], { type: 'text/plain;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Agricare_Farm_Report_${now.toISOString().split('T')[0]}.txt`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-10">
       <div className="mb-10">
@@ -118,7 +177,10 @@ const Management: React.FC = () => {
                 <p className="text-xs text-slate-300">NPK requirements are matched against target growth curves for specific cultivars.</p>
               </div>
             </div>
-            <button className="w-full mt-10 py-3 bg-white/10 hover:bg-white/20 rounded-xl text-sm font-bold transition-all">
+            <button 
+              onClick={handleDownloadReport}
+              className="w-full mt-10 py-3 bg-white/10 hover:bg-white/20 rounded-xl text-sm font-bold transition-all"
+            >
               Download Full Report
             </button>
           </div>
