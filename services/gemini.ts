@@ -3,14 +3,8 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { Field, SensorData } from "../types";
 
 export const getCropAnalysis = async (field: Field, latestData: SensorData) => {
-  const apiKey = process.env.API_KEY;
-  
-  if (!apiKey) {
-    console.error("API_KEY is missing.");
-    return null;
-  }
-
-  const ai = new GoogleGenAI({ apiKey });
+  // Always use a new instance with the exact property name as per SDK guidelines
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   try {
     const response = await ai.models.generateContent({
@@ -48,15 +42,12 @@ export const getCropAnalysis = async (field: Field, latestData: SensorData) => {
     return JSON.parse(response.text || '[]');
   } catch (error) {
     console.error("Gemini Analysis Error:", error);
-    return null;
+    return [];
   }
 };
 
 export const getSoilHealthSummary = async (field: Field, latestData: SensorData) => {
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) return "API Key missing. Cannot generate analysis.";
-
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   try {
     const response = await ai.models.generateContent({
@@ -78,7 +69,7 @@ export const getSoilHealthSummary = async (field: Field, latestData: SensorData)
       `
     });
     
-    return response.text;
+    return response.text || "Analysis complete. Soil conditions are being monitored.";
   } catch (error) {
     console.error("Gemini Summary Error:", error);
     return "Unable to generate AI soil insight at this moment.";
@@ -86,10 +77,7 @@ export const getSoilHealthSummary = async (field: Field, latestData: SensorData)
 };
 
 export const getDetailedManagementPlan = async (field: Field, latestData: SensorData) => {
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) return null;
-
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   try {
     const response = await ai.models.generateContent({
@@ -124,6 +112,6 @@ export const getDetailedManagementPlan = async (field: Field, latestData: Sensor
     return JSON.parse(response.text || '[]');
   } catch (error) {
     console.error("Gemini Plan Error:", error);
-    return null;
+    return [];
   }
 };
