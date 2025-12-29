@@ -24,7 +24,7 @@ export const getCropAnalysis = async (field: Field, latestData: SensorData) => {
         - pH Level: ${latestData.ph_level}
         - NPK Profile: Nitrogen ${latestData.npk_n}, Phosphorus ${latestData.npk_p}, Potassium ${latestData.npk_k}
         
-        Focus only on these four markers to determine growth suitability.
+        Focus only on these four markers (Temp, Moisture, pH, NPK) to determine growth suitability.
       `,
       config: {
         responseMimeType: "application/json",
@@ -49,5 +49,38 @@ export const getCropAnalysis = async (field: Field, latestData: SensorData) => {
   } catch (error) {
     console.error("Gemini Analysis Error:", error);
     return null;
+  }
+};
+
+export const getSoilHealthSummary = async (field: Field, latestData: SensorData) => {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) return "API Key missing. Cannot generate analysis.";
+
+  const ai = new GoogleGenAI({ apiKey });
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `
+        Act as an expert agricultural scientist. Provide a 3-4 sentence "Soil Health Summary" for this field in Bangladesh.
+        Field: ${field.field_name}, Location: ${field.location}, Soil: ${field.soil_type}.
+        Latest Markers:
+        - Temperature: ${latestData.temperature.toFixed(1)}°C
+        - Moisture: ${latestData.moisture.toFixed(1)}%
+        - pH: ${latestData.ph_level.toFixed(1)}
+        - NPK: N=${latestData.npk_n}, P=${latestData.npk_p}, K=${latestData.npk_k}
+        
+        Rules:
+        1. Only discuss these 4 markers.
+        2. Be specific about the current status (e.g. "Moisture is high", "pH is slightly acidic").
+        3. Suggest ONE immediate action for the farmer.
+        4. Do not use Markdown headings.
+      `
+    });
+    
+    return response.text;
+  } catch (error) {
+    console.error("Gemini Summary Error:", error);
+    return "Unable to generate AI soil insight at this moment.";
   }
 };

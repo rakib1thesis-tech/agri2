@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, Field, SensorData, CropRecommendation } from '../../types';
 import { MOCK_FIELDS, generateMockSensorData } from '../../constants';
-import { getCropAnalysis } from '../../services/gemini';
+import { getCropAnalysis, getSoilHealthSummary } from '../../services/gemini';
 
 const UserFields: React.FC<{ user: User }> = ({ user }) => {
   const [fields, setFields] = useState<Field[]>(() => {
@@ -12,6 +12,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
   
   const [selectedField, setSelectedField] = useState<Field | null>(null);
   const [recommendations, setRecommendations] = useState<CropRecommendation[] | null>(null);
+  const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -27,9 +28,18 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
     setSelectedField(field);
     setLoading(true);
     setRecommendations(null);
+    setAiSummary(null);
+    
     const latest = generateMockSensorData(field.field_id)[6];
-    const analysis = await getCropAnalysis(field, latest);
+    
+    // Parallel fetch for speed
+    const [analysis, summary] = await Promise.all([
+      getCropAnalysis(field, latest),
+      getSoilHealthSummary(field, latest)
+    ]);
+    
     setRecommendations(analysis);
+    setAiSummary(summary);
     setLoading(false);
   };
 
@@ -80,7 +90,10 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-2xl font-bold text-slate-900">My Fields</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">My Fields</h1>
+          <p className="text-slate-500 text-sm">Select a field to get AI-driven insights.</p>
+        </div>
         <div className="flex gap-4">
           {selectedField && (
             <button onClick={handleExportCSV} className="bg-white text-emerald-600 border border-emerald-100 px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-emerald-50 transition-colors shadow-sm">
@@ -147,32 +160,74 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
         <div className="lg:col-span-3">
           {!selectedField ? (
             <div className="bg-white rounded-3xl border border-dashed border-slate-300 p-20 text-center">
-              <i className="fas fa-map-marked-alt text-3xl text-slate-300 mb-6"></i>
-              <h2 className="text-xl font-bold text-slate-800">Select a field to view analysis</h2>
+              <i className="fas fa-robot text-3xl text-slate-300 mb-6"></i>
+              <h2 className="text-xl font-bold text-slate-800">Select a field to initiate AI Farm Advisor</h2>
+              <p className="text-slate-500 mt-2">Get personalized soil health analysis and crop recommendations.</p>
             </div>
           ) : (
             <div className="space-y-8 animate-in fade-in slide-in-from-right-4">
-              <div className="bg-white p-8 rounded-3xl border border-slate-100 shadow-sm">
-                <h2 className="text-2xl font-bold text-slate-900 mb-1">{selectedField.field_name} Analysis</h2>
-                <p className="text-slate-500">Monitoring Temperature, pH, Moisture, and NPK.</p>
+              {/* Header Card */}
+              <div className="bg-gradient-to-br from-slate-900 to-emerald-950 p-8 rounded-[2rem] text-white shadow-xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500 opacity-5 rounded-full translate-x-20 -translate-y-20"></div>
+                <div className="relative z-10">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center">
+                      <i className="fas fa-robot text-sm"></i>
+                    </div>
+                    <span className="text-xs font-bold uppercase tracking-widest text-emerald-400">AI Farm Advisor Active</span>
+                  </div>
+                  <h2 className="text-3xl font-black">{selectedField.field_name}</h2>
+                  <p className="text-slate-400 mt-1">{selectedField.location} • Monitoring 4 Core Markers</p>
+                </div>
               </div>
 
               {loading ? (
-                <div className="p-12 text-center text-emerald-600 font-bold"><i className="fas fa-circle-notch fa-spin mr-2"></i>Analyzing...</div>
-              ) : recommendations && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {recommendations.map((crop, i) => (
-                    <div key={i} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                      <div className="flex justify-between items-start mb-4">
-                        <i className={`fas ${crop.icon} text-emerald-600 text-xl`}></i>
-                        <span className="text-sm font-bold text-emerald-600">{crop.suitability}% Match</span>
-                      </div>
-                      <h4 className="text-lg font-bold text-slate-900">{crop.name}</h4>
-                      <p className="text-xs text-slate-400 font-bold mt-1 uppercase">Yield: {crop.yield}</p>
-                      <p className="text-sm text-slate-600 mt-4">{crop.requirements}</p>
-                    </div>
-                  ))}
+                <div className="p-20 text-center">
+                  <div className="inline-block w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-6"></div>
+                  <h3 className="text-xl font-bold text-slate-700">Analyzing Field Dynamics...</h3>
+                  <p className="text-slate-500">Correlating Temperature, pH, Moisture, and NPK data.</p>
                 </div>
+              ) : (
+                <>
+                  {/* AI Summary Section */}
+                  {aiSummary && (
+                    <div className="bg-white p-8 rounded-3xl border border-emerald-100 shadow-sm relative overflow-hidden">
+                      <div className="absolute top-0 right-0 p-4">
+                         <i className="fas fa-sparkles text-emerald-200 text-4xl"></i>
+                      </div>
+                      <h3 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
+                        <i className="fas fa-comment-dots text-emerald-600"></i> AI Soil Health Insight
+                      </h3>
+                      <div className="prose prose-emerald max-w-none text-slate-600 leading-relaxed whitespace-pre-line">
+                        {aiSummary}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Recommendations Grid */}
+                  <div>
+                    <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2 px-2">
+                      <i className="fas fa-seedling text-emerald-600"></i> AI-Recommended Crops
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      {recommendations?.map((crop, i) => (
+                        <div key={i} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-md transition-shadow group">
+                          <div className="flex justify-between items-start mb-4">
+                            <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-all">
+                              <i className={`fas ${crop.icon} text-xl`}></i>
+                            </div>
+                            <span className="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded-full">{crop.suitability}% Match</span>
+                          </div>
+                          <h4 className="text-lg font-bold text-slate-900">{crop.name}</h4>
+                          <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 bg-slate-50 rounded text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                            <i className="fas fa-chart-line text-[8px]"></i> Yield: {crop.yield}
+                          </div>
+                          <p className="text-sm text-slate-600 mt-4 leading-relaxed">{crop.requirements}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
               )}
             </div>
           )}
