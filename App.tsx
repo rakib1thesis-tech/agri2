@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import Home from './pages/Home';
@@ -16,17 +17,30 @@ import HowItWorks from './pages/HowItWorks';
 import { User } from './types';
 
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState('home');
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  // Initialize state from localStorage to persist session
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    const savedUser = localStorage.getItem('agricare_session');
+    return savedUser ? JSON.parse(savedUser) : null;
+  });
+  
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    return localStorage.getItem('agricare_session') !== null;
+  });
+
+  const [activeTab, setActiveTab] = useState(() => {
+    // If logged in, default to dashboard, otherwise home
+    return localStorage.getItem('agricare_session') ? 'dashboard' : 'home';
+  });
 
   const handleLogin = (user: User) => {
+    localStorage.setItem('agricare_session', JSON.stringify(user));
     setCurrentUser(user);
     setIsLoggedIn(true);
     setActiveTab('dashboard');
   };
 
   const handleLogout = () => {
+    localStorage.removeItem('agricare_session');
     setCurrentUser(null);
     setIsLoggedIn(false);
     setActiveTab('home');

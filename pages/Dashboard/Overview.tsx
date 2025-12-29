@@ -5,6 +5,8 @@ import { MOCK_FIELDS, generateMockSensorData } from '../../constants';
 
 const Overview: React.FC<{ user: User }> = ({ user }) => {
   const [isUpdating, setIsUpdating] = useState(false);
+  const [updateStep, setUpdateStep] = useState('');
+  
   const latestFields = MOCK_FIELDS.slice(0, 2);
   const alerts = [
     { type: 'warning', text: 'Low moisture detected in Bogura Potato Project.', time: '2h ago' },
@@ -14,11 +16,26 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
 
   const handleUpdateSchedules = () => {
     setIsUpdating(true);
-    // Simulate complex scheduling logic update
-    setTimeout(() => {
-      setIsUpdating(false);
-      alert("Irrigation and Fertilizer schedules have been optimized for the upcoming monsoon rain! Check Management Hub for details.");
-    }, 2000);
+    
+    const steps = [
+      'Analyzing recent weather patterns...',
+      'Calculating evaporation rates...',
+      'Optimizing irrigation cycles...',
+      'Finalizing management plan...'
+    ];
+
+    let currentStep = 0;
+    const interval = setInterval(() => {
+      if (currentStep < steps.length) {
+        setUpdateStep(steps[currentStep]);
+        currentStep++;
+      } else {
+        clearInterval(interval);
+        setIsUpdating(false);
+        setUpdateStep('');
+        alert("Success! Schedules updated based on the latest monsoon data. You can view the new prescriptions in the Management Hub.");
+      }
+    }, 800);
   };
 
   return (
@@ -96,11 +113,18 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
               <button 
                 onClick={handleUpdateSchedules}
                 disabled={isUpdating}
-                className={`w-full py-3 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${
-                  isUpdating ? 'bg-emerald-700 cursor-not-allowed' : 'bg-emerald-500 hover:bg-emerald-600'
+                className={`w-full py-3 rounded-xl text-sm font-bold transition-all flex flex-col items-center justify-center gap-1 ${
+                  isUpdating ? 'bg-emerald-700 cursor-not-allowed' : 'bg-emerald-500 hover:bg-emerald-600 shadow-xl shadow-emerald-950/20'
                 }`}
               >
-                {isUpdating ? <><i className="fas fa-spinner fa-spin"></i> Optimizing...</> : 'Update Schedules'}
+                {isUpdating ? (
+                  <>
+                    <div className="flex items-center gap-2"><i className="fas fa-spinner fa-spin"></i> Optimizing...</div>
+                    <div className="text-[10px] opacity-60 font-normal">{updateStep}</div>
+                  </>
+                ) : (
+                  'Update Schedules'
+                )}
               </button>
             </div>
             <i className="fas fa-cloud-rain absolute -bottom-4 -right-4 text-8xl text-white/5 pointer-events-none"></i>
