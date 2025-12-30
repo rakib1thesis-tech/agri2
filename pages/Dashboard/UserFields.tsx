@@ -1,14 +1,20 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { User, Field, SensorData, CropRecommendation } from '../../types';
 import { MOCK_FIELDS, generateMockSensorData } from '../../constants';
-import { getCropAnalysis, getSoilHealthSummary, getDetailedManagementPlan } from '../../services/gemini';
+import { getCropAnalysis, getSoilHealthSummary, getDetailedManagementPlan, startAIConversation } from '../../services/gemini';
+import { GenerateContentResponse } from "@google/genai";
 
 interface ManagementTask {
   priority: string;
   title: string;
   description: string;
   icon: string;
+}
+
+interface ChatMessage {
+  role: 'user' | 'model';
+  text: string;
 }
 
 const UserFields: React.FC<{ user: User }> = ({ user }) => {
@@ -23,14 +29,24 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
   const [managementPlan, setManagementPlan] = useState<ManagementTask[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
   
-  const [formData, setFormData] = useState({ temp: '', moisture: '', ph: '', npk_n: '', npk_p: '', npk_k: '' });
-  const [editFormData, setEditFormData] = useState<Field | null>(null);
+  // AI Chat Advisor State
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+  const [userInput, setUserInput] = useState("");
+  const [isBotThinking, setIsBotThinking] = useState(false);
+  const chatRef = useRef<any>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     localStorage.setItem('agricare_fields', JSON.stringify(fields));
   }, [fields]);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [chatHistory, isBotThinking]);
 
   const handleFieldSelect = async (field: Field) => {
     setSelectedField(field);
@@ -38,11 +54,18 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
     setRecommendations(null);
     setAiSummary(null);
     setManagementPlan(null);
+    setChatHistory([]);
     
     const latest = generateMockSensorData(field.field_id)[6];
     
+    // Initialize Advisor Chat
+    chatRef.current = startAIConversation(
+      `You are the Agricare AI Advisor. Assist this farmer in ${field.location} with their ${field.field_name} (${field.soil_type} soil).
+       Current Sensor Data: Temp ${latest.temperature.toFixed(1)}°C, Moisture ${latest.moisture.toFixed(1)}%, pH ${latest.ph_level.toFixed(1)}, NPK ${latest.npk_n}-${latest.npk_p}-${latest.npk_k}.
+       Provide expert, localized agricultural advice for Bangladesh.`
+    );
+    
     try {
-      // Fetch analysis data in parallel
       const [analysis, summary, plan] = await Promise.all([
         getCropAnalysis(field, latest),
         getSoilHealthSummary(field, latest),
@@ -59,24 +82,25 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
     }
   };
 
-  const handleEditClick = (field: Field) => {
-    setEditFormData({ ...field });
-    setShowEditModal(true);
-  };
-
-  const handleUpdateField = (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editFormData) return;
-    const updated = fields.map(f => f.field_id === editFormData.field_id ? editFormData : f);
-    setFields(updated);
-    if (selectedField?.field_id === editFormData.field_id) setSelectedField(editFormData);
-    setShowEditModal(false);
-  };
+    if (!userInput.trim() || !chatRef.current || isBotThinking) return;
 
-  const handleFormSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    alert("Data uploaded successfully! AI Advisor will process this in the next refresh.");
-    setShowForm(false);
+    const userMsg = userInput;
+    setUserInput("");
+    setChatHistory(prev => [...prev, { role: 'user', text: userMsg }]);
+    setIsBotThinking(true);
+
+    try {
+      const response: GenerateContentResponse = await chatRef.current.sendMessage({ message: userMsg });
+      const botText = response.text || "I'm having trouble analyzing the latest satellite telemetry. Please try again.";
+      setChatHistory(prev => [...prev, { role: 'model', text: botText }]);
+    } catch (error) {
+      console.error("Advisor Error:", error);
+      setChatHistory(prev => [...prev, { role: 'model', text: "Error connecting to AI system. Please verify network." }]);
+    } finally {
+      setIsBotThinking(false);
+    }
   };
 
   const handleExportCSV = () => {
@@ -96,11 +120,11 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative min-h-[80vh]">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">My Fields</h1>
-          <p className="text-slate-500 text-sm">Select a field to get AI-driven insights.</p>
+          <h1 className="text-2xl font-bold text-slate-900">Field Command Center</h1>
+          <p className="text-slate-500 text-sm">Real-time IoT and AI Diagnostics Hub</p>
         </div>
         <div className="flex gap-4">
           {selectedField && (
@@ -108,198 +132,231 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
               <i className="fas fa-file-csv"></i> Export Data
             </button>
           )}
-          <button onClick={() => setShowForm(!showForm)} className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-emerald-700 transition-colors shadow-md">
-            <i className="fas fa-plus"></i> Manual Data Upload
+          <button onClick={() => setShowForm(!showForm)} className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-emerald-700 transition-all shadow-md">
+            <i className="fas fa-plus"></i> Manual Upload
           </button>
         </div>
       </div>
 
-      {showForm && (
-        <div className="mb-8 bg-white p-6 rounded-2xl shadow-md border border-emerald-100 animate-in fade-in slide-in-from-top-4">
-          <h3 className="font-bold text-lg mb-4">Manual Sensor Input (4 Core Markers)</h3>
-          <form onSubmit={handleFormSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Temp (°C)</label>
-              <input type="number" step="0.1" required className="w-full px-4 py-2 border rounded-lg" value={formData.temp} onChange={e => setFormData({...formData, temp: e.target.value})} />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Moisture (%)</label>
-              <input type="number" step="0.1" required className="w-full px-4 py-2 border rounded-lg" value={formData.moisture} onChange={e => setFormData({...formData, moisture: e.target.value})} />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">pH Level</label>
-              <input type="number" step="0.1" required className="w-full px-4 py-2 border rounded-lg" value={formData.ph} onChange={e => setFormData({...formData, ph: e.target.value})} />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">NPK - Nitrogen (ppm)</label>
-              <input type="number" required className="w-full px-4 py-2 border rounded-lg" value={formData.npk_n} onChange={e => setFormData({...formData, npk_n: e.target.value})} />
-            </div>
-            <div className="md:col-span-4">
-              <button type="submit" className="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold hover:bg-emerald-700 transition-all">Submit Analysis Data</button>
-            </div>
-          </form>
-        </div>
-      )}
-
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+        {/* Field Selection Sidebar */}
         <div className="lg:col-span-1 space-y-4">
           {fields.map(f => (
-            <div 
+            <button 
               key={f.field_id}
               onClick={() => handleFieldSelect(f)}
-              className={`relative cursor-pointer w-full text-left p-6 rounded-2xl border transition-all ${
+              className={`w-full text-left p-6 rounded-2xl border transition-all ${
                 selectedField?.field_id === f.field_id 
                   ? 'border-emerald-500 bg-emerald-50 shadow-md ring-1 ring-emerald-500' 
                   : 'border-slate-100 bg-white shadow-sm hover:border-emerald-300'
               }`}
             >
-              <div className="font-bold text-slate-900 pr-12">{f.field_name}</div>
+              <div className="font-bold text-slate-900">{f.field_name}</div>
               <div className="text-sm text-slate-500 mt-1">{f.location}</div>
               <div className="mt-4 flex items-center gap-2">
                 <span className="text-[10px] font-bold uppercase tracking-wider bg-slate-100 px-2 py-0.5 rounded text-slate-600">{f.soil_type}</span>
               </div>
-              <div className="absolute top-4 right-4 flex flex-col gap-2">
-                <button onClick={(e) => { e.stopPropagation(); handleEditClick(f); }} className="w-8 h-8 rounded-lg bg-slate-100 text-slate-400 hover:bg-emerald-100 hover:text-emerald-600 flex items-center justify-center transition-colors"><i className="fas fa-edit text-xs"></i></button>
-              </div>
-            </div>
+            </button>
           ))}
         </div>
 
+        {/* Dashboard Area */}
         <div className="lg:col-span-3">
           {!selectedField ? (
-            <div className="bg-white rounded-3xl border border-dashed border-slate-300 p-20 text-center">
-              <i className="fas fa-robot text-3xl text-slate-300 mb-6"></i>
-              <h2 className="text-xl font-bold text-slate-800">Select a field to initiate AI Farm Advisor</h2>
-              <p className="text-slate-500 mt-2">Get personalized soil health analysis and crop recommendations.</p>
+            <div className="bg-white rounded-[3rem] border border-dashed border-slate-300 p-24 text-center">
+              <div className="w-20 h-20 bg-slate-50 text-slate-300 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                <i className="fas fa-satellite text-3xl"></i>
+              </div>
+              <h2 className="text-2xl font-bold text-slate-800">Field Diagnostics Ready</h2>
+              <p className="text-slate-500 mt-2 max-w-sm mx-auto">Select a field to initialize Gemini-driven analysis and localized management roadmaps.</p>
             </div>
           ) : (
             <div className="space-y-8 animate-in fade-in slide-in-from-right-4">
-              {/* Header Card */}
-              <div className="bg-gradient-to-br from-slate-900 to-emerald-950 p-8 rounded-[2rem] text-white shadow-xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500 opacity-5 rounded-full translate-x-20 -translate-y-20"></div>
-                <div className="relative z-10">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center">
-                      <i className="fas fa-robot text-sm"></i>
+              {/* Field Header Card */}
+              <div className="bg-slate-900 p-10 rounded-[2.5rem] text-white shadow-2xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-80 h-80 bg-emerald-500 opacity-5 rounded-full translate-x-20 -translate-y-20"></div>
+                <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                  <div>
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center">
+                        <i className="fas fa-robot text-sm"></i>
+                      </div>
+                      <span className="text-xs font-bold uppercase tracking-widest text-emerald-400">AI Advisor Online</span>
                     </div>
-                    <span className="text-xs font-bold uppercase tracking-widest text-emerald-400">AI Farm Advisor Active</span>
+                    <h2 className="text-4xl font-black">{selectedField.field_name}</h2>
+                    <p className="text-slate-400 mt-1">{selectedField.location} • {selectedField.size} Hectares</p>
                   </div>
-                  <h2 className="text-3xl font-black">{selectedField.field_name}</h2>
-                  <p className="text-slate-400 mt-1">{selectedField.location} • Monitoring 4 Core Markers</p>
+                  <button 
+                    onClick={() => setIsChatOpen(true)}
+                    className="bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-3 rounded-2xl font-bold flex items-center gap-3 transition-all shadow-xl shadow-emerald-950/40 transform hover:-translate-y-0.5"
+                  >
+                    <i className="fas fa-comment-medical text-lg"></i> Consult Advisor
+                  </button>
                 </div>
               </div>
 
               {loading ? (
-                <div className="p-20 text-center">
-                  <div className="inline-block w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-6"></div>
-                  <h3 className="text-xl font-bold text-slate-700">Analyzing Field Dynamics...</h3>
-                  <p className="text-slate-500">Correlating Temperature, pH, Moisture, and NPK data.</p>
+                <div className="bg-white p-24 text-center rounded-[3rem] border border-slate-100 shadow-sm">
+                  <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-8"></div>
+                  <h3 className="text-2xl font-bold text-slate-800">Synthesizing Sensor Tensors...</h3>
+                  <p className="text-slate-500">Connecting Temperature, pH, and NPK data to Regional Crop Models.</p>
                 </div>
               ) : (
-                <>
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    {/* Left Column: Recommendations */}
-                    <div className="lg:col-span-2 space-y-8">
-                      {/* AI Summary Section */}
-                      {aiSummary && (
-                        <div className="bg-white p-8 rounded-3xl border border-emerald-100 shadow-sm relative overflow-hidden">
-                          <div className="absolute top-0 right-0 p-4">
-                             <i className="fas fa-sparkles text-emerald-200 text-4xl"></i>
-                          </div>
-                          <h3 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
-                            <i className="fas fa-comment-dots text-emerald-600"></i> AI Soil Health Insight
-                          </h3>
-                          <div className="prose prose-emerald max-w-none text-slate-600 leading-relaxed whitespace-pre-line">
-                            {aiSummary}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Recommendations Grid */}
-                      <div>
-                        <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2 px-2">
-                          <i className="fas fa-seedling text-emerald-600"></i> AI-Recommended Crops
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          {recommendations?.map((crop, i) => (
-                            <div key={i} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-md transition-shadow group">
-                              <div className="flex justify-between items-start mb-4">
-                                <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-all">
-                                  <i className={`fas ${crop.icon} text-xl`}></i>
-                                </div>
-                                <span className="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded-full">{crop.suitability}% Match</span>
-                              </div>
-                              <h4 className="text-lg font-bold text-slate-900">{crop.name}</h4>
-                              <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 bg-slate-50 rounded text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                                <i className="fas fa-chart-line text-[8px]"></i> Yield: {crop.yield}
-                              </div>
-                              <p className="text-sm text-slate-600 mt-4 leading-relaxed">{crop.requirements}</p>
-                            </div>
-                          ))}
-                        </div>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-12">
+                  {/* Primary Content Column */}
+                  <div className="lg:col-span-2 space-y-8">
+                    {/* Summary Card */}
+                    <div className="bg-white p-8 rounded-[2rem] border border-emerald-100 shadow-sm relative group overflow-hidden">
+                      <div className="absolute top-0 right-0 p-6">
+                         <i className="fas fa-sparkles text-emerald-50 text-5xl group-hover:scale-110 transition-transform"></i>
                       </div>
+                      <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-3">
+                        <i className="fas fa-dna text-emerald-600"></i> AI Soil Health Insight
+                      </h3>
+                      <p className="text-slate-600 leading-relaxed whitespace-pre-line text-lg font-medium">
+                        {aiSummary}
+                      </p>
                     </div>
 
-                    {/* Right Column: Management Roadmap */}
-                    <div className="lg:col-span-1">
-                      <div className="bg-slate-50 p-6 rounded-[2.5rem] border border-slate-200 sticky top-24">
-                        <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
-                          <i className="fas fa-clipboard-list text-emerald-600"></i> AI Management Roadmap
-                        </h3>
-                        
-                        <div className="space-y-6">
-                          {managementPlan?.map((task, i) => (
-                            <div key={i} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 group hover:border-emerald-300 transition-colors">
-                              <div className="flex justify-between items-start mb-2">
-                                <div className={`px-2 py-0.5 rounded text-[8px] font-bold uppercase tracking-widest ${
-                                  task.priority === 'High' ? 'bg-red-100 text-red-600' : 
-                                  task.priority === 'Medium' ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'
-                                }`}>
-                                  {task.priority} Priority
-                                </div>
-                                <i className={`fas ${task.icon} text-slate-300 group-hover:text-emerald-500 transition-colors`}></i>
+                    {/* Recommendations Grid */}
+                    <div>
+                      <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-3 px-2">
+                        <i className="fas fa-seedling text-emerald-600"></i> Crop Suitability Index
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {recommendations?.map((crop, i) => (
+                          <div key={i} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl hover:border-emerald-200 transition-all group">
+                            <div className="flex justify-between items-start mb-6">
+                              <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-all shadow-inner">
+                                <i className={`fas ${crop.icon} text-2xl`}></i>
                               </div>
-                              <h4 className="font-bold text-slate-900 text-sm mb-1">{task.title}</h4>
-                              <p className="text-xs text-slate-500 leading-relaxed">{task.description}</p>
+                              <span className="bg-emerald-50 text-emerald-700 text-xs font-bold px-3 py-1 rounded-full shadow-sm">{crop.suitability}% Match</span>
                             </div>
-                          ))}
-                          
-                          {!managementPlan && (
-                            <div className="text-center py-10">
-                              <i className="fas fa-robot text-2xl text-slate-300 mb-4 animate-bounce"></i>
-                              <p className="text-xs text-slate-400">Loading your personalized roadmap...</p>
+                            <h4 className="text-xl font-bold text-slate-900 mb-1">{crop.name}</h4>
+                            <div className="inline-flex items-center gap-2 px-2 py-0.5 bg-slate-50 rounded text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-4">
+                              <i className="fas fa-chart-line text-[8px]"></i> Forecast: {crop.yield}
                             </div>
-                          )}
-                        </div>
-                        
-                        <div className="mt-8 p-4 bg-emerald-600 rounded-2xl text-white text-center">
-                          <div className="text-[10px] font-bold uppercase tracking-widest opacity-80 mb-1">AI Recommendation Confidence</div>
-                          <div className="text-2xl font-black">94.2%</div>
-                        </div>
+                            <p className="text-sm text-slate-600 leading-relaxed border-t border-slate-50 pt-4">{crop.requirements}</p>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>
-                </>
+
+                  {/* Roadmap Sidebar */}
+                  <div className="lg:col-span-1">
+                    <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm sticky top-24">
+                      <h3 className="text-xl font-bold text-slate-900 mb-8 flex items-center gap-3">
+                        <i className="fas fa-list-check text-emerald-600"></i> Management Roadmap
+                      </h3>
+                      
+                      <div className="space-y-6">
+                        {managementPlan?.map((task, i) => (
+                          <div key={i} className="relative pl-6 group">
+                            <div className="absolute left-0 top-0 bottom-0 w-1 bg-slate-100 group-hover:bg-emerald-200 rounded-full transition-colors"></div>
+                            <div className="flex justify-between items-center mb-2">
+                              <div className={`text-[10px] font-bold uppercase tracking-widest ${
+                                task.priority === 'High' ? 'text-red-600' : 'text-emerald-600'
+                              }`}>
+                                {task.priority} Priority
+                              </div>
+                              <i className={`fas ${task.icon} text-slate-300`}></i>
+                            </div>
+                            <h4 className="font-bold text-slate-900 text-sm mb-1">{task.title}</h4>
+                            <p className="text-xs text-slate-500 leading-relaxed">{task.description}</p>
+                          </div>
+                        ))}
+                      </div>
+                      
+                      <div className="mt-10 p-5 bg-slate-900 rounded-[1.5rem] text-white text-center shadow-xl shadow-slate-200">
+                        <div className="text-[10px] font-bold uppercase tracking-widest opacity-60 mb-1">Diagnostic Confidence</div>
+                        <div className="text-3xl font-black text-emerald-400">94.2%</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
           )}
         </div>
       </div>
 
-      {showEditModal && editFormData && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl w-full max-w-lg p-8 shadow-2xl animate-in zoom-in duration-200">
-            <h2 className="text-2xl font-bold mb-6">Edit Field Details</h2>
-            <form onSubmit={handleUpdateField} className="space-y-4">
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">Field Name</label>
-                <input type="text" required className="w-full px-4 py-2 border rounded-xl" value={editFormData.field_name} onChange={e => setEditFormData({...editFormData, field_name: e.target.value})} />
+      {/* AI Chat Advisor Panel */}
+      {isChatOpen && (
+        <div className="fixed inset-0 z-[200] flex justify-end">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setIsChatOpen(false)}></div>
+          <div className="relative w-full max-w-lg bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+            {/* Header */}
+            <div className="p-8 bg-emerald-600 text-white flex justify-between items-center shadow-lg">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center">
+                  <i className="fas fa-robot text-2xl"></i>
+                </div>
+                <div>
+                  <h3 className="font-bold text-xl leading-none">AI Advisor</h3>
+                  <p className="text-xs text-emerald-100 uppercase tracking-widest mt-2">Personal Field Consultant</p>
+                </div>
               </div>
-              <div className="flex gap-3 pt-6">
-                <button type="button" onClick={() => setShowEditModal(false)} className="flex-1 py-3 rounded-xl font-bold text-slate-500 bg-slate-100">Cancel</button>
-                <button type="submit" className="flex-1 py-3 rounded-xl font-bold text-white bg-emerald-600">Save Changes</button>
-              </div>
-            </form>
+              <button onClick={() => setIsChatOpen(false)} className="w-10 h-10 rounded-full hover:bg-white/10 flex items-center justify-center transition-colors">
+                <i className="fas fa-times text-xl"></i>
+              </button>
+            </div>
+
+            {/* Chat History */}
+            <div ref={scrollRef} className="flex-1 overflow-y-auto p-8 space-y-6 scroll-smooth">
+              {chatHistory.length === 0 ? (
+                <div className="text-center py-20 px-6">
+                  <div className="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                    <i className="fas fa-comment-dots text-3xl"></i>
+                  </div>
+                  <h4 className="font-bold text-slate-900 mb-2">How can I help you today?</h4>
+                  <p className="text-sm text-slate-500 leading-relaxed italic">"What's the best time to apply Urea given current moisture levels?" or "How does the predicted monsoon affect my potato yield?"</p>
+                </div>
+              ) : (
+                chatHistory.map((msg, i) => (
+                  <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[90%] p-5 rounded-3xl text-sm leading-relaxed ${
+                      msg.role === 'user' 
+                        ? 'bg-emerald-600 text-white rounded-br-none shadow-lg' 
+                        : 'bg-slate-100 text-slate-800 rounded-bl-none border border-slate-200 shadow-sm'
+                    }`}>
+                      {msg.text}
+                    </div>
+                  </div>
+                ))
+              )}
+              {isBotThinking && (
+                <div className="flex justify-start">
+                  <div className="bg-slate-50 border border-slate-200 p-5 rounded-3xl rounded-bl-none shadow-sm">
+                    <div className="flex gap-2">
+                      <div className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce"></div>
+                      <div className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce delay-150"></div>
+                      <div className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce delay-300"></div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Input Bar */}
+            <div className="p-8 border-t border-slate-100 bg-slate-50">
+              <form onSubmit={handleSendMessage} className="flex gap-3">
+                <input 
+                  type="text" 
+                  value={userInput}
+                  onChange={(e) => setUserInput(e.target.value)}
+                  placeholder="Ask advisor..."
+                  className="flex-1 bg-white border border-slate-200 rounded-[1.5rem] px-6 py-4 text-sm focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 shadow-inner"
+                />
+                <button 
+                  type="submit"
+                  disabled={isBotThinking || !userInput.trim()}
+                  className="w-14 h-14 bg-emerald-600 text-white rounded-[1.5rem] flex items-center justify-center hover:bg-emerald-700 transition-all disabled:opacity-50 shadow-lg shadow-emerald-200 active:scale-95"
+                >
+                  <i className="fas fa-paper-plane text-lg"></i>
+                </button>
+              </form>
+            </div>
           </div>
         </div>
       )}
