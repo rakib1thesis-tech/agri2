@@ -1,17 +1,27 @@
 
-import React, { useState } from 'react';
-import { User } from '../../types';
+import React, { useState, useEffect } from 'react';
+import { User, Field } from '../../types';
 import { MOCK_FIELDS, generateMockSensorData } from '../../constants';
 
 const Overview: React.FC<{ user: User }> = ({ user }) => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateStep, setUpdateStep] = useState('');
+  const [fieldCount, setFieldCount] = useState(MOCK_FIELDS.length);
+  const [latestFields, setLatestFields] = useState<Field[]>(MOCK_FIELDS.slice(0, 2));
   
-  const latestFields = MOCK_FIELDS.slice(0, 2);
+  useEffect(() => {
+    const savedFields = localStorage.getItem('agricare_fields');
+    if (savedFields) {
+      const parsed = JSON.parse(savedFields);
+      setFieldCount(parsed.length);
+      setLatestFields(parsed.slice(0, 2));
+    }
+  }, []);
+
   const alerts = [
-    { type: 'warning', text: 'Low moisture detected in Bogura Potato Project.', time: '2h ago' },
+    { type: 'warning', text: 'Low moisture detected in your primary plots.', time: '2h ago' },
     { type: 'info', text: 'Weekly soil health report ready for review.', time: '5h ago' },
-    { type: 'danger', text: 'Sensor #104 (Mymensingh Paddy Field) offline.', time: '1d ago' },
+    { type: 'danger', text: 'One of your sensors is currently offline.', time: '1d ago' },
   ];
 
   const handleUpdateSchedules = () => {
@@ -57,9 +67,9 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
               <div className="text-slate-500 text-sm mb-1">Active Fields</div>
-              <div className="text-3xl font-bold text-slate-900">3</div>
+              <div className="text-3xl font-bold text-slate-900">{fieldCount}</div>
               <div className="text-xs text-emerald-600 mt-2 font-medium">
-                <i className="fas fa-caret-up mr-1"></i> +1 from last month
+                <i className="fas fa-chart-line mr-1"></i> Data-linked fields
               </div>
             </div>
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
@@ -77,14 +87,14 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
           {/* Field Snapshot */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-              <h3 className="font-bold text-slate-900">Field Monitoring Snapshots</h3>
+              <h3 className="font-bold text-slate-900">Recent Field Snapshots</h3>
             </div>
             <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-              {latestFields.map(f => {
+              {latestFields.length > 0 ? latestFields.map(f => {
                 const data = generateMockSensorData(f.field_id)[6];
                 return (
                   <div key={f.field_id} className="p-4 bg-slate-50 rounded-xl border border-slate-100">
-                    <div className="font-bold text-slate-800 mb-3">{f.field_name}</div>
+                    <div className="font-bold text-slate-800 mb-3 truncate">{f.field_name}</div>
                     <div className="flex justify-between items-center mb-2">
                       <span className="text-xs text-slate-500">Soil Moisture</span>
                       <span className="text-xs font-bold text-slate-900">{data.moisture.toFixed(1)}%</span>
@@ -94,7 +104,11 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
                     </div>
                   </div>
                 );
-              })}
+              }) : (
+                <div className="col-span-2 text-center py-10 text-slate-400">
+                   <p className="text-sm italic">No fields configured yet.</p>
+                </div>
+              )}
             </div>
           </div>
         </div>

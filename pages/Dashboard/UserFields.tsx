@@ -30,6 +30,15 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   
+  // Modal states
+  const [showAddFieldModal, setShowAddFieldModal] = useState(false);
+  const [newFieldData, setNewFieldData] = useState({
+    name: '',
+    location: '',
+    size: '',
+    soilType: 'Loamy'
+  });
+
   // AI Chat Advisor State
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
@@ -66,7 +75,6 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
     );
     
     try {
-      // Using Promise.all to fetch all AI insights simultaneously
       const [analysis, summary, plan] = await Promise.all([
         getCropAnalysis(field, latest),
         getSoilHealthSummary(field, latest),
@@ -81,6 +89,21 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleAddField = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newField: Field = {
+      field_id: Math.floor(Math.random() * 100000),
+      user_id: user.id,
+      field_name: newFieldData.name,
+      location: newFieldData.location,
+      size: parseFloat(newFieldData.size) || 0,
+      soil_type: newFieldData.soilType
+    };
+    setFields([...fields, newField]);
+    setShowAddFieldModal(false);
+    setNewFieldData({ name: '', location: '', size: '', soilType: 'Loamy' });
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -133,8 +156,8 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
               <i className="fas fa-file-csv"></i> Export Data
             </button>
           )}
-          <button onClick={() => setShowForm(!showForm)} className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-emerald-700 transition-all shadow-md">
-            <i className="fas fa-plus"></i> Manual Upload
+          <button onClick={() => setShowAddFieldModal(true)} className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-emerald-700 transition-all shadow-md">
+            <i className="fas fa-plus"></i> Add New Field
           </button>
         </div>
       </div>
@@ -142,23 +165,30 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
         {/* Field Selection Sidebar */}
         <div className="lg:col-span-1 space-y-4">
-          {fields.map(f => (
-            <button 
-              key={f.field_id}
-              onClick={() => handleFieldSelect(f)}
-              className={`w-full text-left p-6 rounded-2xl border transition-all ${
-                selectedField?.field_id === f.field_id 
-                  ? 'border-emerald-500 bg-emerald-50 shadow-md ring-1 ring-emerald-500' 
-                  : 'border-slate-100 bg-white shadow-sm hover:border-emerald-300'
-              }`}
-            >
-              <div className="font-bold text-slate-900">{f.field_name}</div>
-              <div className="text-sm text-slate-500 mt-1">{f.location}</div>
-              <div className="mt-4 flex items-center gap-2">
-                <span className="text-[10px] font-bold uppercase tracking-wider bg-slate-100 px-2 py-0.5 rounded text-slate-600">{f.soil_type}</span>
-              </div>
-            </button>
-          ))}
+          <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 flex justify-between items-center">
+            <span>Your Fields</span>
+            <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{fields.length}</span>
+          </div>
+          <div className="max-h-[70vh] overflow-y-auto space-y-4 pr-1">
+            {fields.map(f => (
+              <button 
+                key={f.field_id}
+                onClick={() => handleFieldSelect(f)}
+                className={`w-full text-left p-6 rounded-2xl border transition-all animate-in fade-in slide-in-from-left-4 ${
+                  selectedField?.field_id === f.field_id 
+                    ? 'border-emerald-500 bg-emerald-50 shadow-md ring-1 ring-emerald-500' 
+                    : 'border-slate-100 bg-white shadow-sm hover:border-emerald-300'
+                }`}
+              >
+                <div className="font-bold text-slate-900 truncate">{f.field_name}</div>
+                <div className="text-sm text-slate-500 mt-1 truncate">{f.location}</div>
+                <div className="mt-4 flex items-center gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider bg-slate-100 px-2 py-0.5 rounded text-slate-600">{f.soil_type}</span>
+                  <span className="text-[10px] font-bold text-slate-400">{f.size} ha</span>
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Dashboard Area */}
@@ -169,7 +199,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                 <i className="fas fa-satellite text-3xl"></i>
               </div>
               <h2 className="text-2xl font-bold text-slate-800">Field Diagnostics Ready</h2>
-              <p className="text-slate-500 mt-2 max-w-sm mx-auto">Select a field to initialize Gemini-driven analysis and localized management roadmaps.</p>
+              <p className="text-slate-500 mt-2 max-w-sm mx-auto">Select a field from the left sidebar to initialize Gemini-driven analysis and localized management roadmaps.</p>
             </div>
           ) : (
             <div className="space-y-8 animate-in fade-in slide-in-from-right-4">
@@ -204,9 +234,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-12">
-                  {/* Primary Content Column */}
                   <div className="lg:col-span-2 space-y-8">
-                    {/* Summary Card */}
                     <div className="bg-white p-8 rounded-[2rem] border border-emerald-100 shadow-sm relative group overflow-hidden">
                       <div className="absolute top-0 right-0 p-6">
                          <i className="fas fa-sparkles text-emerald-50 text-5xl group-hover:scale-110 transition-transform"></i>
@@ -219,7 +247,6 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                       </p>
                     </div>
 
-                    {/* Recommendations Grid */}
                     <div>
                       <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-3 px-2">
                         <i className="fas fa-seedling text-emerald-600"></i> Crop Suitability Index
@@ -251,7 +278,6 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                     </div>
                   </div>
 
-                  {/* Roadmap Sidebar */}
                   <div className="lg:col-span-1">
                     <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm sticky top-24">
                       <h3 className="text-xl font-bold text-slate-900 mb-8 flex items-center gap-3">
@@ -295,6 +321,88 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
           )}
         </div>
       </div>
+
+      {/* Add Field Modal */}
+      {showAddFieldModal && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-lg p-8 shadow-2xl animate-in zoom-in duration-300">
+            <div className="flex justify-between items-center mb-8">
+              <h2 className="text-2xl font-black text-slate-900">Add New Field</h2>
+              <button onClick={() => setShowAddFieldModal(false)} className="w-10 h-10 rounded-full hover:bg-slate-100 flex items-center justify-center transition-colors">
+                <i className="fas fa-times text-slate-400"></i>
+              </button>
+            </div>
+            
+            <form onSubmit={handleAddField} className="space-y-6">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Field Name</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Northern Paddy Field"
+                  className="w-full px-5 py-3 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all"
+                  value={newFieldData.name}
+                  onChange={e => setNewFieldData({...newFieldData, name: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Location</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Gazipur, Bangladesh"
+                  className="w-full px-5 py-3 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all"
+                  value={newFieldData.location}
+                  onChange={e => setNewFieldData({...newFieldData, location: e.target.value})}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Size (Ha)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    required
+                    placeholder="e.g. 5.5"
+                    className="w-full px-5 py-3 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all"
+                    value={newFieldData.size}
+                    onChange={e => setNewFieldData({...newFieldData, size: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Soil Type</label>
+                  <select
+                    className="w-full px-5 py-3 border border-slate-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all bg-white"
+                    value={newFieldData.soilType}
+                    onChange={e => setNewFieldData({...newFieldData, soilType: e.target.value})}
+                  >
+                    <option value="Loamy">Loamy</option>
+                    <option value="Clay">Clay</option>
+                    <option value="Sandy">Sandy</option>
+                    <option value="Alluvial">Alluvial</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div className="pt-4 flex gap-4">
+                <button 
+                  type="button"
+                  onClick={() => setShowAddFieldModal(false)}
+                  className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-all"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200"
+                >
+                  Create Field
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* AI Chat Advisor Panel */}
       {isChatOpen && (

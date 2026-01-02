@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { User } from '../types';
+import { User, Field } from '../types';
 
 interface SignupProps {
   onSignup: (user: User) => void;
@@ -12,105 +12,199 @@ const Signup: React.FC<SignupProps> = ({ onSignup, onSwitchToLogin }) => {
     name: '',
     email: '',
     password: '',
-    plan: 'premium'
+    plan: 'premium',
+    // Field Setup
+    fieldName: '',
+    location: '',
+    size: '',
+    soilType: 'Loamy'
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    const userId = Math.random().toString(36).substr(2, 9);
+    
     const newUser: User = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: userId,
       name: formData.name,
       email: formData.email,
       subscriptionPlan: formData.plan as any,
-      subscriptionEnd: '2025-12-31'
+      subscriptionEnd: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0]
     };
 
-    // Save to our mock "database" of users so they can log back in later
+    // Create the initial field for the user
+    const initialField: Field = {
+      field_id: Math.floor(Math.random() * 10000),
+      user_id: userId,
+      field_name: formData.fieldName || 'My First Field',
+      location: formData.location || 'Bangladesh',
+      size: parseFloat(formData.size) || 1.0,
+      soil_type: formData.soilType
+    };
+
+    // Persistence: Register the User
     const registeredUsers = JSON.parse(localStorage.getItem('agricare_registered_users') || '[]');
-    // Check if user already exists to avoid duplicates
     if (!registeredUsers.find((u: User) => u.email === formData.email)) {
       localStorage.setItem('agricare_registered_users', JSON.stringify([...registeredUsers, newUser]));
     }
+    
+    // Persistence: Register the Field
+    const existingFields = JSON.parse(localStorage.getItem('agricare_fields') || '[]');
+    localStorage.setItem('agricare_fields', JSON.stringify([...existingFields, initialField]));
     
     onSignup(newUser);
   };
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center px-4 py-12">
-      <div className="max-w-md w-full space-y-8 bg-white p-10 rounded-3xl border border-slate-100 shadow-xl">
+    <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-slate-50/50">
+      <div className="max-w-2xl w-full space-y-8 bg-white p-8 md:p-12 rounded-[2.5rem] border border-slate-100 shadow-2xl">
         <div className="text-center">
-          <div className="w-16 h-16 bg-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-100">
+          <div className="w-16 h-16 bg-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-xl shadow-emerald-100">
             <i className="fas fa-user-plus text-white text-2xl"></i>
           </div>
-          <h2 className="text-3xl font-extrabold text-slate-900">Join Agricare</h2>
-          <p className="mt-2 text-sm text-slate-500">Start your 30-day free trial today</p>
+          <h2 className="text-3xl font-black text-slate-900">Start Your Agri-Journey</h2>
+          <p className="mt-2 text-sm text-slate-500">Create your account and set up your first field in minutes.</p>
         </div>
         
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
-              <input
-                type="text"
-                required
-                className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-xl shadow-sm placeholder-slate-400 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
-                placeholder="John Doe"
-                value={formData.name}
-                onChange={e => setFormData({...formData, name: e.target.value})}
-              />
+        <form className="mt-8 space-y-10" onSubmit={handleSubmit}>
+          {/* Section 1: Personal Info */}
+          <div className="space-y-6">
+            <div className="flex items-center gap-3 mb-2">
+              <span className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold">1</span>
+              <h3 className="font-bold text-slate-800 uppercase tracking-widest text-xs">Account Information</h3>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Email address</label>
-              <input
-                type="email"
-                required
-                className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-xl shadow-sm placeholder-slate-400 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
-                placeholder="you@farm.com"
-                value={formData.email}
-                onChange={e => setFormData({...formData, email: e.target.value})}
-              />
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Full Name</label>
+                <input
+                  type="text"
+                  required
+                  className="appearance-none block w-full px-4 py-3 border border-slate-200 rounded-2xl shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all sm:text-sm"
+                  placeholder="e.g. Arif Hossain"
+                  value={formData.name}
+                  onChange={e => setFormData({...formData, name: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Email address</label>
+                <input
+                  type="email"
+                  required
+                  className="appearance-none block w-full px-4 py-3 border border-slate-200 rounded-2xl shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all sm:text-sm"
+                  placeholder="arif@gmail.com"
+                  value={formData.email}
+                  onChange={e => setFormData({...formData, email: e.target.value})}
+                />
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
-              <input
-                type="password"
-                required
-                className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-xl shadow-sm placeholder-slate-400 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
-                placeholder="••••••••"
-                value={formData.password}
-                onChange={e => setFormData({...formData, password: e.target.value})}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Preferred Plan</label>
-              <select 
-                className="block w-full px-4 py-3 border border-slate-300 rounded-xl shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
-                value={formData.plan}
-                onChange={e => setFormData({...formData, plan: e.target.value})}
-              >
-                <option value="basic">Basic (৳1,500/mo)</option>
-                <option value="premium">Premium (৳5,000/mo) - Best Value</option>
-              </select>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Password</label>
+                <input
+                  type="password"
+                  required
+                  className="appearance-none block w-full px-4 py-3 border border-slate-200 rounded-2xl shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all sm:text-sm"
+                  placeholder="••••••••"
+                  value={formData.password}
+                  onChange={e => setFormData({...formData, password: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Subscription Plan</label>
+                <select 
+                  className="block w-full px-4 py-3 border border-slate-200 rounded-2xl shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all sm:text-sm"
+                  value={formData.plan}
+                  onChange={e => setFormData({...formData, plan: e.target.value})}
+                >
+                  <option value="basic">Basic (৳1,500/mo)</option>
+                  <option value="premium">Premium (৳5,000/mo)</option>
+                </select>
+              </div>
             </div>
           </div>
 
-          <div className="text-xs text-slate-500">
-            By clicking "Create Account", you agree to our Terms of Service and Privacy Policy. No credit card required for trial.
+          {/* Section 2: Farm Info */}
+          <div className="space-y-6 pt-4 border-t border-slate-100">
+            <div className="flex items-center gap-3 mb-2">
+              <span className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold">2</span>
+              <h3 className="font-bold text-slate-800 uppercase tracking-widest text-xs">Initial Farm Setup</h3>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Field Name</label>
+                <input
+                  type="text"
+                  required
+                  className="appearance-none block w-full px-4 py-3 border border-slate-200 rounded-2xl shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all sm:text-sm"
+                  placeholder="e.g. Rajshahi Mango Plot A"
+                  value={formData.fieldName}
+                  onChange={e => setFormData({...formData, fieldName: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">District / Location</label>
+                <input
+                  type="text"
+                  required
+                  className="appearance-none block w-full px-4 py-3 border border-slate-200 rounded-2xl shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all sm:text-sm"
+                  placeholder="e.g. Puthia, Rajshahi"
+                  value={formData.location}
+                  onChange={e => setFormData({...formData, location: e.target.value})}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Size (Hectares)</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  required
+                  className="appearance-none block w-full px-4 py-3 border border-slate-200 rounded-2xl shadow-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all sm:text-sm"
+                  placeholder="e.g. 5.5"
+                  value={formData.size}
+                  onChange={e => setFormData({...formData, size: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Soil Type</label>
+                <select 
+                  className="block w-full px-4 py-3 border border-slate-200 rounded-2xl shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all sm:text-sm"
+                  value={formData.soilType}
+                  onChange={e => setFormData({...formData, soilType: e.target.value})}
+                >
+                  <option value="Loamy">Loamy (উর্বর দোআঁশ)</option>
+                  <option value="Clay">Clay (এঁটেল)</option>
+                  <option value="Sandy">Sandy (বেলে)</option>
+                  <option value="Alluvial">Alluvial (পলি)</option>
+                  <option value="Peaty">Peaty (পিট)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-emerald-50 p-4 rounded-2xl text-[11px] text-emerald-800 leading-relaxed border border-emerald-100 flex gap-3 items-start">
+            <i className="fas fa-info-circle mt-0.5"></i>
+            <span>By clicking "Create Account", you agree to our Terms of Service. You will receive 30 days of Premium AI insights for free to analyze your first field.</span>
           </div>
 
           <button
             type="submit"
-            className="group relative w-full flex justify-center py-4 px-4 border border-transparent text-sm font-bold rounded-xl text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 shadow-lg shadow-emerald-100 transition-all active:scale-95"
+            className="group relative w-full flex justify-center py-4 px-4 border border-transparent text-sm font-black rounded-2xl text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 shadow-xl shadow-emerald-200 transition-all transform hover:-translate-y-0.5 active:scale-95"
           >
-            Create Account
+            Deploy My Farm Dashboard
           </button>
         </form>
 
         <div className="text-center">
           <p className="text-sm text-slate-500">
-            Already have an account?{' '}
-            <button onClick={onSwitchToLogin} className="font-bold text-emerald-600 hover:text-emerald-500">Sign in here</button>
+            Already registered?{' '}
+            <button onClick={onSwitchToLogin} className="font-bold text-emerald-600 hover:text-emerald-500 transition-colors">Sign in here</button>
           </p>
         </div>
       </div>
