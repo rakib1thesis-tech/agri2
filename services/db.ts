@@ -1,9 +1,10 @@
+
 import { initializeApp, getApp, getApps, FirebaseApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, Auth } from 'firebase/auth';
 import { getFirestore, doc, getDoc, setDoc, collection, getDocs, query, where, deleteDoc, Firestore } from 'firebase/firestore';
 import { User, Field, Sensor } from '../types';
 
-// Real configuration for your project: agricare-4c725
+// Configuration for project: agricare-4c725
 const firebaseConfig = {
   apiKey: "AIzaSyCeyl_T15XCsu0-tbXoXaZ2t7C3oMLjyF8",
   authDomain: "agricare-4c725.firebaseapp.com",
@@ -22,14 +23,30 @@ export const isFirebaseEnabled = () => !!db;
 
 export const loginUser = async (email: string, pass: string): Promise<User | null> => {
   try {
+    // 1. Authenticate with Firebase Auth
     const cred = await signInWithEmailAndPassword(auth, email, pass);
-    const userDoc = await getDoc(doc(db, 'users', cred.user.uid));
+    
+    // 2. Fetch User Profile from Firestore
+    // Note: If this fails with "insufficient permissions", check Firestore Rules tab
+    const userDocRef = doc(db, 'users', cred.user.uid);
+    const userDoc = await getDoc(userDocRef);
+    
     if (userDoc.exists()) {
       return userDoc.data() as User;
+    } else {
+      // If user exists in Auth but not Firestore, create a basic profile
+      const fallbackUser: User = {
+        id: cred.user.uid,
+        name: email.split('@')[0],
+        email: email,
+        subscriptionPlan: 'basic',
+        subscriptionEnd: new Date(Date.now() + 31536000000).toISOString()
+      };
+      await setDoc(userDocRef, fallbackUser);
+      return fallbackUser;
     }
-    return null;
   } catch (e: any) {
-    console.error("Login Error:", e.code, e.message);
+    console.error("Database Login Error Details:", e);
     throw e;
   }
 };
@@ -39,10 +56,9 @@ export const registerUser = async (user: User, pass: string): Promise<User> => {
     const cred = await createUserWithEmailAndPassword(auth, user.email, pass);
     const userData = { ...user, id: cred.user.uid };
     await setDoc(doc(db, 'users', cred.user.uid), userData);
-    console.log("User registered in Firestore:", cred.user.uid);
     return userData;
   } catch (e: any) {
-    console.error("Registration Error:", e.code, e.message);
+    console.error("Registration Error:", e);
     throw e;
   }
 };
@@ -52,8 +68,7 @@ export const syncFields = async (userId: string): Promise<Field[]> => {
   try {
     const q = query(collection(db, 'fields'), where('user_id', '==', userId));
     const snap = await getDocs(q);
-    const cloudFields = snap.docs.map(d => d.data() as Field);
-    return cloudFields;
+    return snap.docs.map(d => d.data() as Field);
   } catch (e) {
     console.error("Sync Fields Error:", e);
     return [];
@@ -64,7 +79,6 @@ export const addFieldToDb = async (field: Field): Promise<void> => {
   if (!db) throw new Error("Database not initialized");
   try {
     await setDoc(doc(db, 'fields', field.field_id.toString()), field);
-    console.log("Field added to Firestore");
   } catch (e) {
     console.error("Add Field Error:", e);
     throw e;
@@ -99,4 +113,4 @@ export const deleteSensorFromDb = async (id: number): Promise<void> => {
   } catch (e) {
     console.error(e);
   }
-};
+}
