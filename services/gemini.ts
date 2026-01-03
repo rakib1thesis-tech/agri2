@@ -3,7 +3,6 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { Field, SensorData } from "../types";
 
 export const checkAIConnection = () => {
-  // We assume the key is provided by the environment as per system instructions
   return true;
 };
 
@@ -20,7 +19,7 @@ const getAIClient = () => {
  * Clearly identifies what we HAVE and what we are MISSING.
  */
 const formatDataForPrompt = (data: any) => {
-  const safeVal = (val: any) => (val !== null && val !== undefined) ? Number(val).toFixed(1) : null;
+  const safeVal = (val: any) => (val != null) ? Number(val).toFixed(1) : null;
 
   const m = safeVal(data.moisture);
   const t = safeVal(data.temperature);
@@ -31,12 +30,12 @@ const formatDataForPrompt = (data: any) => {
 
   return `
     CURRENT SENSOR READINGS:
-    - Soil Moisture: ${m ? `${m}%` : 'Not Measured'}
-    - Soil pH: ${ph ? ph : 'Not Measured'}
-    - Temperature: ${t ? `${t}°C` : 'Not Measured'}
-    - Nitrogen (N): ${n ? `${n} ppm` : 'Not Measured'}
-    - Phosphorus (P): ${p ? `${p} ppm` : 'Not Measured'}
-    - Potassium (K): ${k ? `${k} ppm` : 'Not Measured'}
+    - Soil Moisture: ${m != null ? `${m}%` : 'Not Measured'}
+    - Soil pH: ${ph != null ? ph : 'Not Measured'}
+    - Temperature: ${t != null ? `${t}°C` : 'Not Measured'}
+    - Nitrogen (N): ${n != null ? `${n} ppm` : 'Not Measured'}
+    - Phosphorus (P): ${p != null ? `${p} ppm` : 'Not Measured'}
+    - Potassium (K): ${k != null ? `${k} ppm` : 'Not Measured'}
     
     NOTE: If a value is "Not Measured", use your expert knowledge of the region (${data.location || 'Bangladesh'}) and soil type (${data.soil_type || 'Loamy'}) to provide the best possible advice.
   `;
@@ -53,7 +52,7 @@ export const getCropAnalysis = async (field: Field, latestData: any) => {
         ${formatDataForPrompt({...latestData, location: field.location, soil_type: field.soil_type})}
         
         GOAL: Provide the top 3 recommended crops based ON THE PROVIDED DATA. 
-        If some data is missing (like NPK), recommend crops that generally thrive in ${field.soil_type} soil in the ${field.location} region, adjusted for the current ${latestData.moisture}% moisture and ${latestData.ph_level} pH.
+        If some data is missing (like NPK), recommend crops that generally thrive in ${field.soil_type} soil in the ${field.location} region, adjusted for the available measurements.
       `,
       config: {
         responseMimeType: "application/json",
@@ -91,14 +90,14 @@ export const getSoilHealthSummary = async (field: Field, latestData: any) => {
         Location: ${field.location}, Soil: ${field.soil_type}.
         ${formatDataForPrompt({...latestData, location: field.location, soil_type: field.soil_type})}
         
-        Provide a 3-sentence summary. If data like NPK is missing, focus your analysis on the Moisture and pH levels you DO have, and mention that a full nutrient profile would allow for even more precision. No markdown.
+        Provide a 3-sentence summary based on available markers. No markdown.
       `
     });
     
-    return response.text || "Analysis complete. Data suggests standard maintenance.";
+    return response.text || "Analysis complete based on available telemetry.";
   } catch (error) {
     console.error("Gemini Summary Error:", error);
-    return "AI system is processing data. Please refresh in a moment.";
+    return "AI analysis is currently unavailable.";
   }
 };
 
@@ -112,11 +111,7 @@ export const getDetailedManagementPlan = async (field: Field, latestData: any) =
         Field: ${field.field_name}, Location: ${field.location}, Soil: ${field.soil_type}.
         ${formatDataForPrompt({...latestData, location: field.location, soil_type: field.soil_type})}
         
-        PRIORITY RULES:
-        1. If moisture is very low (<15%), 'Irrigation' must be High Priority.
-        2. If pH is outside 6.0-7.5, 'pH Correction' must be High/Medium Priority.
-        3. If NPK is missing, suggest 'Comprehensive Soil Testing' as a task.
-        4. Base your descriptions on the REAL values provided.
+        Prioritize tasks based on current Moisture and pH readings. If NPK is missing, suggest a soil test.
       `,
       config: {
         responseMimeType: "application/json",

@@ -18,7 +18,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [managementPlan, setManagementPlan] = useState<ManagementTask[] | null>(null);
   const [loading, setLoading] = useState(false);
-  const [aiConnected, setAiConnected] = useState(true); // Default to true for better UX
+  const [aiConnected, setAiConnected] = useState(true);
   
   const [currentDataState, setCurrentDataState] = useState<any>(null);
 
@@ -65,12 +65,12 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
     });
 
     if (fieldManual) {
-      if (fieldManual.moisture !== undefined && fieldManual.moisture !== null) stats.moisture = fieldManual.moisture;
-      if (fieldManual.temp !== undefined && fieldManual.temp !== null) stats.temperature = fieldManual.temp;
-      if (fieldManual.ph !== undefined && fieldManual.ph !== null) stats.ph_level = fieldManual.ph;
-      if (fieldManual.n !== undefined && fieldManual.n !== null) stats.npk_n = fieldManual.n;
-      if (fieldManual.p !== undefined && fieldManual.p !== null) stats.npk_p = fieldManual.p;
-      if (fieldManual.k !== undefined && fieldManual.k !== null) stats.npk_k = fieldManual.k;
+      if (fieldManual.moisture != null) stats.moisture = fieldManual.moisture;
+      if (fieldManual.temp != null) stats.temperature = fieldManual.temp;
+      if (fieldManual.ph != null) stats.ph_level = fieldManual.ph;
+      if (fieldManual.n != null) stats.npk_n = fieldManual.n;
+      if (fieldManual.p != null) stats.npk_p = fieldManual.p;
+      if (fieldManual.k != null) stats.npk_k = fieldManual.k;
     }
 
     return stats;
@@ -82,6 +82,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
     setRecommendations(null);
     setAiSummary(null);
     setManagementPlan(null);
+    setCurrentDataState(null); // Reset state to prevent stale data UI crashes
     
     try {
       const latest = await getFieldCurrentStats(field);
@@ -96,10 +97,9 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       setRecommendations(analysis);
       setAiSummary(summary);
       setManagementPlan(plan);
-      setAiConnected(true);
     } catch (err) {
       console.error("Field analysis failed", err);
-      setAiSummary("AI is analyzing your data. This may take a moment...");
+      setAiSummary("AI is processing your unique field metrics. Hang tight...");
     } finally {
       setLoading(false);
     }
@@ -129,7 +129,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
           <h1 className="text-2xl font-bold text-slate-900">Field Command Center</h1>
           <p className="text-slate-500 text-sm">Real-time analysis from your IoT network and manual logs.</p>
         </div>
-        <button onClick={() => setShowAddFieldModal(true)} className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-emerald-700 shadow-md">
+        <button onClick={() => setShowAddFieldModal(true)} className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-emerald-700 shadow-md transition-all active:scale-95">
           <i className="fas fa-plus"></i> Add New Field
         </button>
       </div>
@@ -160,8 +160,8 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
               <div className="w-20 h-20 bg-slate-50 text-slate-300 rounded-3xl flex items-center justify-center mx-auto mb-6">
                 <i className="fas fa-satellite text-3xl"></i>
               </div>
-              <h2 className="text-2xl font-bold text-slate-800">Field Diagnostics Ready</h2>
-              <p className="text-slate-500 mt-2 max-w-sm mx-auto">Select a field to initiate real-time analysis based on your available sensor readings.</p>
+              <h2 className="text-2xl font-bold text-slate-800">Select a Field</h2>
+              <p className="text-slate-500 mt-2 max-w-sm mx-auto">Click a field on the left to see live diagnostics and AI recommendations.</p>
             </div>
           ) : (
             <div className="space-y-8 animate-in fade-in slide-in-from-right-4">
@@ -180,17 +180,17 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                   </div>
                   
                   <div className="bg-white/10 backdrop-blur-md p-6 rounded-3xl flex flex-wrap gap-6 text-[11px] font-bold uppercase tracking-wider border border-white/5">
-                    <div className={`flex items-center gap-2 ${currentDataState?.moisture !== null ? 'text-emerald-400' : 'text-slate-500 opacity-50'}`}>
-                      <i className={`fas ${currentDataState?.moisture !== null ? 'fa-check-circle' : 'fa-circle-xmark'}`}></i>
-                      <span>Moisture {currentDataState?.moisture !== null ? `(${currentDataState.moisture}%)` : 'Missing'}</span>
+                    <div className={`flex items-center gap-2 ${(currentDataState?.moisture != null) ? 'text-emerald-400' : 'text-slate-500 opacity-50'}`}>
+                      <i className={`fas ${(currentDataState?.moisture != null) ? 'fa-check-circle' : 'fa-circle-xmark'}`}></i>
+                      <span>Moisture {(currentDataState?.moisture != null) ? `(${currentDataState.moisture}%)` : 'Missing'}</span>
                     </div>
-                    <div className={`flex items-center gap-2 ${currentDataState?.ph_level !== null ? 'text-emerald-400' : 'text-slate-500 opacity-50'}`}>
-                      <i className={`fas ${currentDataState?.ph_level !== null ? 'fa-check-circle' : 'fa-circle-xmark'}`}></i>
-                      <span>pH {currentDataState?.ph_level !== null ? `(${currentDataState.ph_level})` : 'Missing'}</span>
+                    <div className={`flex items-center gap-2 ${(currentDataState?.ph_level != null) ? 'text-emerald-400' : 'text-slate-500 opacity-50'}`}>
+                      <i className={`fas ${(currentDataState?.ph_level != null) ? 'fa-check-circle' : 'fa-circle-xmark'}`}></i>
+                      <span>pH {(currentDataState?.ph_level != null) ? `(${currentDataState.ph_level})` : 'Missing'}</span>
                     </div>
-                    <div className={`flex items-center gap-2 ${currentDataState?.npk_n !== null ? 'text-emerald-400' : 'text-slate-500 opacity-50'}`}>
-                      <i className={`fas ${currentDataState?.npk_n !== null ? 'fa-check-circle' : 'fa-circle-xmark'}`}></i>
-                      <span>NPK Data {currentDataState?.npk_n !== null ? 'Active' : 'Missing'}</span>
+                    <div className={`flex items-center gap-2 ${(currentDataState?.npk_n != null) ? 'text-emerald-400' : 'text-slate-500 opacity-50'}`}>
+                      <i className={`fas ${(currentDataState?.npk_n != null) ? 'fa-check-circle' : 'fa-circle-xmark'}`}></i>
+                      <span>NPK Data {(currentDataState?.npk_n != null) ? 'Active' : 'Missing'}</span>
                     </div>
                   </div>
                 </div>
@@ -200,18 +200,18 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                 <div className="bg-white p-24 text-center rounded-[3rem] border border-slate-100 shadow-sm">
                   <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-8"></div>
                   <h3 className="text-2xl font-bold text-slate-800">Processing Diagnostic Stream...</h3>
-                  <p className="text-slate-500 mt-2">Gemini-3 is analyzing your specific field profile.</p>
+                  <p className="text-slate-500 mt-2">Gemini-3 is analyzing your field telemetry.</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-12">
                   <div className="lg:col-span-2 space-y-8">
-                    <div className="bg-white p-10 rounded-[2.5rem] border border-emerald-100 shadow-sm relative group overflow-hidden">
+                    <div className="bg-white p-10 rounded-[2.5rem] border border-emerald-100 shadow-sm relative group overflow-hidden min-h-[200px]">
                       <div className="absolute top-0 right-0 p-8 text-emerald-100 text-6xl opacity-20 pointer-events-none">
                         <i className="fas fa-dna"></i>
                       </div>
                       <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-3"><i className="fas fa-sparkles text-emerald-600"></i> AI Soil Health Insight</h3>
                       <p className="text-slate-600 leading-relaxed whitespace-pre-line text-lg font-medium">
-                        {aiSummary || "Analysis results are being finalized..."}
+                        {aiSummary || "Select a field and provide measurements to begin analysis."}
                       </p>
                     </div>
 
@@ -236,7 +236,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                       ) : (
                         <div className="bg-slate-50 p-12 rounded-[2.5rem] border border-dashed border-slate-200 text-center text-slate-400">
                           <i className="fas fa-chart-area text-3xl mb-4 block opacity-30"></i>
-                          <p className="text-sm font-medium">Providing best-effort recommendations based on your Moisture & pH sensors.</p>
+                          <p className="text-sm font-medium">Add sensor data or manual measurements to see recommendations.</p>
                         </div>
                       )}
                     </div>
@@ -260,7 +260,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                         ) : (
                           <div className="text-center py-12 text-slate-300">
                             <i className="fas fa-clipboard-list text-4xl mb-4 block opacity-20"></i>
-                            <p className="text-sm">Calculating roadmap from current sensor telemetry...</p>
+                            <p className="text-sm">Complete measurements to generate your roadmap.</p>
                           </div>
                         )}
                       </div>
