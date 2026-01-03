@@ -41,6 +41,11 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [userInput, setUserInput] = useState("");
   const [isBotThinking, setIsBotThinking] = useState(false);
+  
+  // Manual AI Entry State
+  const [showManualConsole, setShowManualConsole] = useState(false);
+  const [manualKey, setManualKey] = useState("");
+  
   const chatRef = useRef<any>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -128,19 +133,40 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
     setNewFieldData({ name: '', location: '', size: '', soilType: 'Loamy' });
   };
 
+  const handleManualKeySubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!manualKey.trim()) return;
+    
+    localStorage.setItem('agricare_user_api_key', manualKey.trim());
+    setAiConnected(true);
+    setShowManualConsole(false);
+    if (selectedField) {
+      initChat(selectedField);
+      handleFieldSelect(selectedField);
+    }
+  };
+
   const handleConnectAI = async () => {
     const aistudio = (window as any).aistudio;
     if (aistudio) {
       try {
         await aistudio.openSelectKey();
-        setAiConnected(true);
-        if (selectedField) {
-          initChat(selectedField);
-          handleFieldSelect(selectedField);
+        const hasKey = await aistudio.hasSelectedApiKey();
+        if (hasKey) {
+          setAiConnected(true);
+          if (selectedField) {
+            initChat(selectedField);
+            handleFieldSelect(selectedField);
+          }
+        } else {
+          setShowManualConsole(true);
         }
       } catch (e) {
-        console.error("Failed to connect AI", e);
+        console.error("Native selector failed, falling back to manual console", e);
+        setShowManualConsole(true);
       }
+    } else {
+      setShowManualConsole(true);
     }
   };
 
@@ -496,15 +522,37 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                     <i className="fas fa-plug text-3xl"></i>
                   </div>
                   <h4 className="font-bold text-slate-900 mb-2">Advisor Offline</h4>
-                  <p className="text-sm text-slate-500 leading-relaxed mb-8">
-                    The advisor is currently offline. Please connect your API key to enable specialized agricultural support.
-                  </p>
-                  <button 
-                    onClick={handleConnectAI}
-                    className="bg-slate-900 text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-800 transition-all active:scale-95"
-                  >
-                    <i className="fas fa-key"></i> Connect Gemini AI
-                  </button>
+                  
+                  {showManualConsole ? (
+                    <div className="w-full animate-in zoom-in">
+                      <p className="text-xs text-slate-500 mb-4">Manual configuration required to link station.</p>
+                      <form onSubmit={handleManualKeySubmit} className="space-y-4">
+                        <textarea 
+                          rows={3}
+                          value={manualKey}
+                          onChange={(e) => setManualKey(e.target.value)}
+                          placeholder="Paste API code..."
+                          className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none text-sm font-mono"
+                        />
+                        <div className="flex gap-2">
+                          <button type="submit" className="flex-1 bg-emerald-600 text-white py-3 rounded-xl font-bold text-sm">Submit Code</button>
+                          <button type="button" onClick={() => setShowManualConsole(false)} className="px-4 py-3 bg-slate-100 text-slate-500 rounded-xl font-bold text-sm">Back</button>
+                        </div>
+                      </form>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-sm text-slate-500 leading-relaxed mb-8">
+                        The advisor is currently offline. Please connect your API key to enable specialized agricultural support.
+                      </p>
+                      <button 
+                        onClick={handleConnectAI}
+                        className="bg-slate-900 text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-800 transition-all active:scale-95"
+                      >
+                        <i className="fas fa-key"></i> Connect Gemini AI
+                      </button>
+                    </>
+                  )}
                 </div>
               ) : chatHistory.length === 0 ? (
                 <div className="text-center py-20 px-6">
