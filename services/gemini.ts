@@ -3,18 +3,21 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { Field, SensorData } from "../types";
 
 /**
- * Safely checks if the API_KEY is available in the environment.
+ * Safely checks if an API key is available via environment or manual submission.
  */
 export const checkAIConnection = () => {
-  return !!process.env.API_KEY;
+  const userKey = localStorage.getItem('agricare_user_api_key');
+  return !!(userKey || process.env.API_KEY);
 };
 
 /**
  * Creates a new GoogleGenAI client instance.
- * As per guidelines, we create this right before use to ensure it uses the latest key.
+ * Checks for a manually submitted key first, then falls back to process.env.API_KEY.
  */
 const getAIClient = () => {
-  const apiKey = process.env.API_KEY;
+  const userKey = localStorage.getItem('agricare_user_api_key');
+  const apiKey = userKey || process.env.API_KEY;
+  
   if (!apiKey) {
     throw new Error("API_KEY_MISSING");
   }

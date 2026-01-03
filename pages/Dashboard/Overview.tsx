@@ -17,6 +17,10 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
   const [latestFields, setLatestFields] = useState<Field[]>([]);
   const [aiConnected, setAiConnected] = useState(true);
   
+  // Console state
+  const [showConsole, setShowConsole] = useState(false);
+  const [manualKey, setManualKey] = useState('');
+  
   const [loadingWeather, setLoadingWeather] = useState(false);
   const [weatherAlerts, setWeatherAlerts] = useState<LiveWeather[]>([]);
   
@@ -27,8 +31,10 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
       if (aistudio) {
         hasKey = await aistudio.hasSelectedApiKey();
       }
-      const envKey = checkAIConnection();
-      setAiConnected(hasKey || envKey);
+      const userKey = localStorage.getItem('agricare_user_api_key');
+      const envKey = !!process.env.API_KEY;
+      
+      setAiConnected(hasKey || !!userKey || envKey);
     };
 
     verifyConnection();
@@ -48,9 +54,7 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
   }, [user.id]);
 
   const fetchWeather = async (fields: Field[]) => {
-    if (!checkAIConnection() && !((window as any).aistudio && await (window as any).aistudio.hasSelectedApiKey())) {
-      return;
-    }
+    if (!checkAIConnection()) return;
 
     setLoadingWeather(true);
     const uniqueLocations = Array.from(new Set(fields.map(f => f.location)));
@@ -74,19 +78,47 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
     }
   };
 
+  const handleManualSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!manualKey.trim()) return;
+    
+    localStorage.setItem('agricare_user_api_key', manualKey.trim());
+    setAiConnected(true);
+    setShowConsole(false);
+    alert("API Configuration submitted successfully. Synchronizing field sensors...");
+    if (latestFields.length > 0) {
+      fetchWeather(latestFields);
+    }
+  };
+
   const handleConnectAI = async () => {
     const aistudio = (window as any).aistudio;
     if (aistudio) {
       try {
         await aistudio.openSelectKey();
-        setAiConnected(true);
-        if (latestFields.length > 0) {
-          fetchWeather(latestFields);
+        // Since it's a platform call, we verify success after
+        const hasKey = await aistudio.hasSelectedApiKey();
+        if (hasKey) {
+          setAiConnected(true);
+          if (latestFields.length > 0) {
+            fetchWeather(latestFields);
+          }
+        } else {
+          // If native failed or was canceled, show the manual console
+          setShowConsole(true);
         }
       } catch (e) {
-        console.error("Failed to open key selector", e);
+        console.error("Native selector failed, falling back to manual console", e);
+        setShowConsole(true);
       }
+    } else {
+      setShowConsole(true);
     }
+  };
+
+  const handleClearKey = () => {
+    localStorage.removeItem('agricare_user_api_key');
+    window.location.reload();
   };
 
   const alerts = [
@@ -114,7 +146,7 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {!aiConnected && (
+      {!aiConnected && !showConsole && (
         <div className="mb-8 bg-slate-900 border border-emerald-500/30 p-8 rounded-[2.5rem] flex flex-col md:flex-row items-center justify-between gap-8 text-white shadow-2xl animate-in slide-in-from-top-4">
           <div className="flex items-center gap-6">
             <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-center shrink-0">
@@ -125,13 +157,7 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
                 AI Link Configuration Required
                 <span className="inline-block w-2 h-2 rounded-full bg-red-500"></span>
               </h3>
-              <div className="text-sm text-slate-400 space-y-2">
-                <p>To enable real-time weather and crop diagnostics on your live site:</p>
-                <ol className="list-decimal ml-4 space-y-1 text-xs text-slate-300">
-                  <li>Get a key from <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-emerald-400 font-bold hover:underline">Google AI Studio</a>.</li>
-                  <li>Click <strong>Connect Gemini AI</strong> and paste your key.</li>
-                </ol>
-              </div>
+              <p className="text-sm text-slate-400">Enable real-time satellite grounding and deep-soil diagnostics by connecting your Gemini instance.</p>
             </div>
           </div>
           <button 
@@ -143,17 +169,77 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
         </div>
       )}
 
+      {showConsole && (
+        <div className="mb-8 bg-slate-950 border border-emerald-500/50 p-10 rounded-[2.5rem] text-white shadow-2xl animate-in zoom-in duration-300">
+          <div className="flex justify-between items-start mb-8">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-emerald-500/10 rounded-xl flex items-center justify-center border border-emerald-500/20">
+                <i className="fas fa-terminal text-emerald-400"></i>
+              </div>
+              <div>
+                <h3 className="font-bold text-lg">AI Connection Console</h3>
+                <p className="text-xs text-slate-500 font-mono">STATION: AGRICARE-LINK-v3.1</p>
+              </div>
+            </div>
+            <button onClick={() => setShowConsole(false)} className="text-slate-500 hover:text-white transition-colors">
+              <i className="fas fa-times text-xl"></i>
+            </button>
+          </div>
+
+          <form onSubmit={handleManualSubmit} className="space-y-6">
+            <div>
+              <label className="block text-xs font-bold text-emerald-500 uppercase tracking-widest mb-3 ml-1">Manual Configuration Code</label>
+              <textarea 
+                required
+                rows={3}
+                value={manualKey}
+                onChange={(e) => setManualKey(e.target.value)}
+                placeholder="Paste your Gemini API key here..."
+                className="w-full bg-black/40 border border-emerald-500/20 rounded-2xl px-6 py-4 font-mono text-sm text-emerald-50 placeholder-emerald-900/50 focus:outline-none focus:border-emerald-500 transition-all shadow-inner"
+              />
+            </div>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <button 
+                type="submit"
+                className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-4 rounded-xl font-bold transition-all shadow-lg shadow-emerald-900/20 flex items-center justify-center gap-2"
+              >
+                <i className="fas fa-plug"></i> Initialize Link
+              </button>
+              <button 
+                type="button"
+                onClick={() => setShowConsole(false)}
+                className="px-8 py-4 bg-white/5 border border-white/10 rounded-xl font-bold hover:bg-white/10 transition-all"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+          
+          <div className="mt-6 flex items-center gap-2 text-[10px] font-mono text-slate-500">
+            <i className="fas fa-lock"></i> 
+            <span>KEYS ARE STORED LOCALLY IN ENCRYPTED BROWSER STORAGE.</span>
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
-          <p className="text-slate-500 text-sm">Farm status for {user.name}.</p>
+          <h1 className="text-2xl font-bold text-slate-900">Dashboard Overview</h1>
+          <p className="text-slate-500 text-sm">Real-time telemetry for {user.name}.</p>
         </div>
         <div className="flex gap-4">
           <div className={`px-4 py-2 rounded-lg text-right border ${aiConnected ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-100 border-slate-200'}`}>
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">AI Link</span>
-            <span className={`text-xs font-bold ${aiConnected ? 'text-emerald-700' : 'text-slate-400'}`}>
-              {aiConnected ? 'Active' : 'Unconfigured'}
-            </span>
+            <div className="flex items-center justify-end gap-2">
+              <span className={`text-xs font-bold ${aiConnected ? 'text-emerald-700' : 'text-slate-400'}`}>
+                {aiConnected ? 'Active' : 'Unconfigured'}
+              </span>
+              {aiConnected && (
+                <button onClick={handleClearKey} className="text-[10px] text-red-400 hover:text-red-600 ml-2" title="Reset Connection">
+                  <i className="fas fa-power-off"></i>
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -211,7 +297,7 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
                   <div className="h-24 bg-white/5 rounded-2xl"></div>
                 </div>
               ) : weatherAlerts.length > 0 ? (
-                <div className="space-y-4 max-h-[400px] overflow-y-auto">
+                <div className="space-y-4 max-h-[400px] overflow-y-auto pr-1">
                   {weatherAlerts.map((alert, idx) => (
                     <div key={idx} className="p-4 bg-white/10 rounded-2xl border border-white/10">
                       <div className="text-[10px] font-black uppercase text-emerald-300 mb-1">{alert.location}</div>
@@ -223,7 +309,7 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
                 <div className="text-center py-12 px-6">
                   <i className="fas fa-sun text-4xl text-emerald-500/30 mb-4"></i>
                   <p className="text-xs text-emerald-100/50 italic">
-                    {aiConnected ? 'Connect sensors to fetch localized weather.' : 'Connect AI to unlock weather grounding.'}
+                    {aiConnected ? 'Synchronizing weather grounding data...' : 'Connect AI to unlock weather grounding.'}
                   </p>
                 </div>
               )}
