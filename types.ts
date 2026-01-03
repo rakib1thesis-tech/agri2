@@ -30,6 +30,13 @@ export interface SensorData {
   timestamp: string;
 }
 
+export interface SensorReading {
+  value?: number;
+  n?: number;
+  p?: number;
+  k?: number;
+}
+
 export interface Sensor {
   sensor_id: number;
   field_id: number;
@@ -37,6 +44,7 @@ export interface Sensor {
   battery_level: number;
   status: 'active' | 'inactive' | 'maintenance';
   last_active: string;
+  last_reading?: SensorReading;
 }
 
 export interface CropRecommendation {
