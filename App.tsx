@@ -28,41 +28,72 @@ const App: React.FC = () => {
   });
 
   const [activeTab, setActiveTab] = useState(() => {
+    const hash = window.location.hash.replace('#', '');
+    if (hash) return hash;
     // If logged in, default to dashboard, otherwise home
     return localStorage.getItem('agricare_session') ? 'dashboard' : 'home';
   });
+
+  // Handle browser back/forward buttons
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#', '');
+      if (hash) {
+        setActiveTab(hash);
+      } else {
+        const defaultTab = isLoggedIn ? 'dashboard' : 'home';
+        setActiveTab(defaultTab);
+      }
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    // Sync initial state with hash if present
+    if (window.location.hash) {
+      handleHashChange();
+    } else {
+      // Set initial hash if empty
+      window.location.hash = activeTab;
+    }
+
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, [isLoggedIn, activeTab]);
+
+  // Wrapper for navigation to update hash
+  const navigateTo = (tab: string) => {
+    window.location.hash = tab;
+  };
 
   const handleLogin = (user: User) => {
     localStorage.setItem('agricare_session', JSON.stringify(user));
     setCurrentUser(user);
     setIsLoggedIn(true);
-    setActiveTab('dashboard');
+    navigateTo('dashboard');
   };
 
   const handleLogout = () => {
     localStorage.removeItem('agricare_session');
     setCurrentUser(null);
     setIsLoggedIn(false);
-    setActiveTab('home');
+    navigateTo('home');
   };
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'home': return <Home onGetStarted={() => setActiveTab('signup')} />;
-      case 'features-public': return <FeaturesPublic onNavigate={(tab) => setActiveTab(tab)} />;
+      case 'home': return <Home onGetStarted={() => navigateTo('signup')} />;
+      case 'features-public': return <FeaturesPublic onNavigate={navigateTo} />;
       case 'how-it-works': return <HowItWorks />;
       case 'public-dashboard': return <PublicDashboard />;
       case 'pricing': return <Pricing />;
-      case 'login': return <Login onLogin={handleLogin} onSwitchToSignup={() => setActiveTab('signup')} />;
-      case 'signup': return <Signup onSignup={handleLogin} onSwitchToLogin={() => setActiveTab('login')} />;
+      case 'login': return <Login onLogin={handleLogin} onSwitchToSignup={() => navigateTo('signup')} />;
+      case 'signup': return <Signup onSignup={handleLogin} onSwitchToLogin={() => navigateTo('login')} />;
       
       // Auth Protected
-      case 'dashboard': return isLoggedIn ? <Overview user={currentUser!} /> : <Login onLogin={handleLogin} onSwitchToSignup={() => setActiveTab('signup')} />;
-      case 'management': return isLoggedIn ? <Management user={currentUser!} /> : <Login onLogin={handleLogin} onSwitchToSignup={() => setActiveTab('signup')} />;
-      case 'fields': return isLoggedIn ? <UserFields user={currentUser!} /> : <Login onLogin={handleLogin} onSwitchToSignup={() => setActiveTab('signup')} />;
-      case 'sensors': return isLoggedIn ? <Sensors user={currentUser!} /> : <Login onLogin={handleLogin} onSwitchToSignup={() => setActiveTab('signup')} />;
+      case 'dashboard': return isLoggedIn ? <Overview user={currentUser!} /> : <Login onLogin={handleLogin} onSwitchToSignup={() => navigateTo('signup')} />;
+      case 'management': return isLoggedIn ? <Management user={currentUser!} /> : <Login onLogin={handleLogin} onSwitchToSignup={() => navigateTo('signup')} />;
+      case 'fields': return isLoggedIn ? <UserFields user={currentUser!} /> : <Login onLogin={handleLogin} onSwitchToSignup={() => navigateTo('signup')} />;
+      case 'sensors': return isLoggedIn ? <Sensors user={currentUser!} /> : <Login onLogin={handleLogin} onSwitchToSignup={() => navigateTo('signup')} />;
       
-      default: return <Home onGetStarted={() => setActiveTab('signup')} />;
+      default: return <Home onGetStarted={() => navigateTo('signup')} />;
     }
   };
 
@@ -70,7 +101,7 @@ const App: React.FC = () => {
     <div className="min-h-screen flex flex-col">
       <Navbar 
         activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
+        setActiveTab={navigateTo} 
         isLoggedIn={isLoggedIn} 
         onLogout={handleLogout} 
       />
@@ -79,7 +110,7 @@ const App: React.FC = () => {
         {renderContent()}
       </main>
 
-      <Footer onNavigate={setActiveTab} />
+      <Footer onNavigate={navigateTo} />
     </div>
   );
 };
