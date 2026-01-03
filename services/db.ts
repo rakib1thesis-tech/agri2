@@ -21,33 +21,46 @@ const db: Firestore = getFirestore(app);
 
 export const isFirebaseEnabled = () => !!db;
 
+/**
+ * Handles Firestore specific errors to provide better user feedback
+ */
+const handleFirestoreError = (e: any) => {
+  if (e.code === 'permission-denied') {
+    throw new Error("Database Access Denied: Please check your Firestore Security Rules in the Firebase Console. Ensure you have published rules that allow 'read' access for authenticated users.");
+  }
+  throw e;
+};
+
 export const loginUser = async (email: string, pass: string): Promise<User | null> => {
   try {
     // 1. Authenticate with Firebase Auth
     const cred = await signInWithEmailAndPassword(auth, email, pass);
     
     // 2. Fetch User Profile from Firestore
-    // Note: If this fails with "insufficient permissions", check Firestore Rules tab
-    const userDocRef = doc(db, 'users', cred.user.uid);
-    const userDoc = await getDoc(userDocRef);
-    
-    if (userDoc.exists()) {
-      return userDoc.data() as User;
-    } else {
-      // If user exists in Auth but not Firestore, create a basic profile
-      const fallbackUser: User = {
-        id: cred.user.uid,
-        name: email.split('@')[0],
-        email: email,
-        subscriptionPlan: 'basic',
-        subscriptionEnd: new Date(Date.now() + 31536000000).toISOString()
-      };
-      await setDoc(userDocRef, fallbackUser);
-      return fallbackUser;
+    try {
+      const userDocRef = doc(db, 'users', cred.user.uid);
+      const userDoc = await getDoc(userDocRef);
+      
+      if (userDoc.exists()) {
+        return userDoc.data() as User;
+      } else {
+        // Create profile if it doesn't exist but user is authenticated
+        const fallbackUser: User = {
+          id: cred.user.uid,
+          name: email.split('@')[0],
+          email: email,
+          subscriptionPlan: 'basic',
+          subscriptionEnd: new Date(Date.now() + 31536000000).toISOString()
+        };
+        await setDoc(userDocRef, fallbackUser);
+        return fallbackUser;
+      }
+    } catch (dbError: any) {
+      return handleFirestoreError(dbError);
     }
-  } catch (e: any) {
-    console.error("Database Login Error Details:", e);
-    throw e;
+  } catch (authError: any) {
+    console.error("Auth Error:", authError);
+    throw authError;
   }
 };
 
@@ -58,8 +71,7 @@ export const registerUser = async (user: User, pass: string): Promise<User> => {
     await setDoc(doc(db, 'users', cred.user.uid), userData);
     return userData;
   } catch (e: any) {
-    console.error("Registration Error:", e);
-    throw e;
+    return handleFirestoreError(e);
   }
 };
 
@@ -80,8 +92,7 @@ export const addFieldToDb = async (field: Field): Promise<void> => {
   try {
     await setDoc(doc(db, 'fields', field.field_id.toString()), field);
   } catch (e) {
-    console.error("Add Field Error:", e);
-    throw e;
+    return handleFirestoreError(e);
   }
 };
 

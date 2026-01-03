@@ -1,20 +1,15 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, Field, SensorData, CropRecommendation, Sensor } from '../../types';
 import { generateMockSensorData } from '../../constants';
-import { getCropAnalysis, getSoilHealthSummary, getDetailedManagementPlan, startAIConversation, checkAIConnection } from '../../services/gemini';
-import { GenerateContentResponse } from "@google/genai";
+import { getCropAnalysis, getSoilHealthSummary, getDetailedManagementPlan, checkAIConnection } from '../../services/gemini';
+import { syncFields, syncSensorsFromDb } from '../../services/db';
 
 interface ManagementTask {
   priority: string;
   title: string;
   description: string;
   icon: string;
-}
-
-interface ChatMessage {
-  role: 'user' | 'model';
-  text: string;
 }
 
 const UserFields: React.FC<{ user: User }> = ({ user }) => {
@@ -34,81 +29,60 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
     soilType: 'Loamy'
   });
 
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
-  const [userInput, setUserInput] = useState("");
-  const [isBotThinking, setIsBotThinking] = useState(false);
-  
-  const chatRef = useRef<any>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
-    // Rely on centralized environment check for AI status
     setAiConnected(checkAIConnection());
-
-    const saved = localStorage.getItem('agricare_fields');
-    if (saved) {
-      const allFields: Field[] = JSON.parse(saved);
-      const userFields = allFields.filter(f => f.user_id === user.id);
-      setFields(userFields);
-    }
+    const loadData = async () => {
+      const dbFields = await syncFields(user.id);
+      setFields(dbFields);
+    };
+    loadData();
   }, [user.id]);
 
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [chatHistory, isBotThinking]);
-
-  // Helper to aggregate the best possible data for a field
-  const getFieldCurrentStats = (field: Field): SensorData => {
-    const savedSensors = localStorage.getItem('agricare_sensors');
-    const sensors: Sensor[] = savedSensors ? JSON.parse(savedSensors) : [];
-    const fieldSensors = sensors.filter(s => s.field_id === field.field_id);
+  /**
+   * Aggregates the most accurate data for a field by merging:
+   * 1. Manual Diagnostic Overrides (Local Storage)
+   * 2. Live Sensor Data (Firestore)
+   * 3. Mock Data (Fallback)
+   */
+  const getFieldCurrentStats = async (field: Field): Promise<SensorData> => {
+    // 1. Get Live Sensors from DB
+    const fieldSensors = await syncSensorsFromDb([field]);
     
+    // 2. Get Manual Diagnostics
     const savedManual = localStorage.getItem('agricare_manual_diagnostics');
     const manualDiags = savedManual ? JSON.parse(savedManual) : {};
     const fieldManual = manualDiags[field.field_id];
 
-    // Default/Fallback values (Mock 7th day)
+    // 3. Start with Mock Base
     const mock = generateMockSensorData(field.field_id)[6];
-    
     const stats: SensorData = { ...mock };
 
+    // 4. Layer Sensor Data (Priority 2)
     if (fieldSensors.length > 0) {
-      // Use assigned sensor readings where available
       fieldSensors.forEach(s => {
         if (!s.last_reading) return;
-        if (s.sensor_type === 'Moisture') stats.moisture = s.last_reading.value || stats.moisture;
-        if (s.sensor_type === 'Temperature') stats.temperature = s.last_reading.value || stats.temperature;
-        if (s.sensor_type === 'PH Probe') stats.ph_level = s.last_reading.value || stats.ph_level;
+        if (s.sensor_type === 'Moisture') stats.moisture = s.last_reading.value ?? stats.moisture;
+        if (s.sensor_type === 'Temperature') stats.temperature = s.last_reading.value ?? stats.temperature;
+        if (s.sensor_type === 'PH Probe') stats.ph_level = s.last_reading.value ?? stats.ph_level;
         if (s.sensor_type === 'NPK Analyzer') {
           stats.npk_n = s.last_reading.n ?? stats.npk_n;
           stats.npk_p = s.last_reading.p ?? stats.npk_p;
           stats.npk_k = s.last_reading.k ?? stats.npk_k;
         }
       });
-    } else if (fieldManual) {
-      // If no sensors, use the manual diagnostics from Sensors page
-      stats.moisture = fieldManual.moisture ?? stats.moisture;
-      stats.temperature = fieldManual.temp ?? stats.temperature;
-      stats.ph_level = fieldManual.ph ?? stats.ph_level;
-      stats.npk_n = fieldManual.n ?? stats.npk_n;
-      stats.npk_p = fieldManual.p ?? stats.npk_p;
-      stats.npk_k = fieldManual.k ?? stats.npk_k;
+    }
+
+    // 5. Layer Manual Data (Priority 1 - Highest Override)
+    if (fieldManual) {
+      if (fieldManual.moisture !== undefined) stats.moisture = fieldManual.moisture;
+      if (fieldManual.temp !== undefined) stats.temperature = fieldManual.temp;
+      if (fieldManual.ph !== undefined) stats.ph_level = fieldManual.ph;
+      if (fieldManual.n !== undefined) stats.npk_n = fieldManual.n;
+      if (fieldManual.p !== undefined) stats.npk_p = fieldManual.p;
+      if (fieldManual.k !== undefined) stats.npk_k = fieldManual.k;
     }
 
     return stats;
-  };
-
-  const initChat = (field: Field) => {
-    if (!aiConnected) return;
-    const latest = getFieldCurrentStats(field);
-    chatRef.current = startAIConversation(
-      `You are the Agricare AI Advisor. Assist this farmer in ${field.location} with their ${field.field_name} (${field.soil_type} soil).
-       Current Sensor Data: Temp ${latest.temperature.toFixed(1)}°C, Moisture ${latest.moisture.toFixed(1)}%, pH ${latest.ph_level.toFixed(1)}, NPK ${latest.npk_n}-${latest.npk_p}-${latest.npk_k}.
-       Provide expert, localized agricultural advice for Bangladesh.`
-    );
   };
 
   const handleFieldSelect = async (field: Field) => {
@@ -117,11 +91,8 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
     setRecommendations(null);
     setAiSummary(null);
     setManagementPlan(null);
-    setChatHistory([]);
     
-    initChat(field);
-    
-    const latest = getFieldCurrentStats(field);
+    const latest = await getFieldCurrentStats(field);
     
     try {
       const [analysis, summary, plan] = await Promise.all([
@@ -142,6 +113,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
 
   const handleAddField = (e: React.FormEvent) => {
     e.preventDefault();
+    // In a real scenario, this would call addFieldToDb
     const newField: Field = {
       field_id: Math.floor(Math.random() * 100000),
       user_id: user.id,
@@ -150,39 +122,12 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       size: parseFloat(newFieldData.size) || 0,
       soil_type: newFieldData.soilType
     };
-    const saved = localStorage.getItem('agricare_fields');
-    const allFields: Field[] = saved ? JSON.parse(saved) : [];
-    localStorage.setItem('agricare_fields', JSON.stringify([...allFields, newField]));
     setFields([...fields, newField]);
     setShowAddFieldModal(false);
     setNewFieldData({ name: '', location: '', size: '', soilType: 'Loamy' });
   };
 
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!userInput.trim() || isBotThinking) return;
-    if (!chatRef.current && selectedField) {
-      initChat(selectedField);
-    }
-    const userMsg = userInput;
-    setUserInput("");
-    setChatHistory(prev => [...prev, { role: 'user', text: userMsg }]);
-    if (!chatRef.current) {
-      setChatHistory(prev => [...prev, { role: 'model', text: "Connection error. AI service is temporarily unavailable." }]);
-      return;
-    }
-    setIsBotThinking(true);
-    try {
-      const response: GenerateContentResponse = await chatRef.current.sendMessage({ message: userMsg });
-      setChatHistory(prev => [...prev, { role: 'model', text: response.text || "No response received." }]);
-    } catch (error) {
-      setChatHistory(prev => [...prev, { role: 'model', text: "Service Error. Please ensure the backend configuration is correct." }]);
-    } finally {
-      setIsBotThinking(false);
-    }
-  };
-
-  const handleExportCSV = () => {
+  const handleExportCSV = async () => {
     if (!selectedField) return;
     const historicalData = generateMockSensorData(selectedField.field_id);
     const headers = ['Timestamp', 'Temp (°C)', 'Moisture (%)', 'pH', 'N', 'P', 'K'];
@@ -255,19 +200,12 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                     <div className="flex items-center gap-3 mb-2">
                       <div className={`w-8 h-8 ${aiConnected ? 'bg-emerald-500' : 'bg-slate-700'} rounded-lg flex items-center justify-center transition-colors`}><i className="fas fa-robot text-sm"></i></div>
                       <span className={`text-xs font-bold uppercase tracking-widest ${aiConnected ? 'text-emerald-400' : 'text-slate-500'}`}>
-                        {aiConnected ? 'AI Advisor Online' : 'AI Advisor Unavailable'}
+                        {aiConnected ? 'AI Analysis Active' : 'AI Analysis Offline'}
                       </span>
                     </div>
                     <h2 className="text-4xl font-black">{selectedField.field_name}</h2>
                     <p className="text-slate-400 mt-1">{selectedField.location} • {selectedField.size} Hectares</p>
                   </div>
-                  <button 
-                    onClick={() => setIsChatOpen(true)} 
-                    disabled={!aiConnected}
-                    className="bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-700 text-white px-8 py-3 rounded-2xl font-bold flex items-center gap-3 transition-all transform hover:-translate-y-0.5"
-                  >
-                    <i className="fas fa-comment-medical text-lg"></i> Consult Advisor
-                  </button>
                 </div>
               </div>
 
@@ -323,60 +261,6 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
           )}
         </div>
       </div>
-
-      {isChatOpen && (
-        <div className="fixed inset-0 z-[400] flex justify-end">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setIsChatOpen(false)}></div>
-          <div className="relative w-full max-w-lg bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
-            <div className="p-8 bg-emerald-600 text-white flex justify-between items-center shadow-lg">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center"><i className="fas fa-robot text-2xl"></i></div>
-                <h3 className="font-bold text-xl">AI Advisor</h3>
-              </div>
-              <button onClick={() => setIsChatOpen(false)} className="w-10 h-10 rounded-full hover:bg-white/10 flex items-center justify-center transition-colors"><i className="fas fa-times text-xl"></i></button>
-            </div>
-            <div ref={scrollRef} className="flex-1 overflow-y-auto p-8 space-y-6 scroll-smooth">
-              {chatHistory.length === 0 && (
-                <div className="text-center py-20 px-8 flex flex-col items-center">
-                  <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-3xl flex items-center justify-center mb-6">
-                    <i className="fas fa-comment-dots text-2xl"></i>
-                  </div>
-                  <h4 className="font-bold text-slate-900 mb-2">How can I help you today?</h4>
-                  <p className="text-sm text-slate-500">Ask about crop disease, irrigation, or fertilizer management.</p>
-                </div>
-              )}
-              {chatHistory.map((msg, i) => (
-                <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[90%] p-5 rounded-3xl text-sm leading-relaxed ${msg.role === 'user' ? 'bg-emerald-600 text-white rounded-br-none shadow-lg' : 'bg-slate-100 text-slate-800 rounded-bl-none border border-slate-200'}`}>{msg.text}</div>
-                </div>
-              ))}
-              {isBotThinking && (
-                <div className="flex justify-start">
-                  <div className="bg-slate-100 p-5 rounded-3xl rounded-bl-none border border-slate-200">
-                    <div className="flex gap-1">
-                      <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"></span>
-                      <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce delay-75"></span>
-                      <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce delay-150"></span>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className={`p-8 border-t bg-slate-50`}>
-              <form onSubmit={handleSendMessage} className="flex gap-3">
-                <input 
-                  type="text" 
-                  value={userInput} 
-                  onChange={(e) => setUserInput(e.target.value)} 
-                  placeholder="Ask your advisor anything..." 
-                  className="flex-1 bg-white border rounded-[1.5rem] px-6 py-4 text-sm outline-none focus:ring-2 focus:ring-emerald-500 border-slate-200" 
-                />
-                <button type="submit" disabled={isBotThinking || !userInput.trim()} className="w-14 h-14 bg-emerald-600 text-white rounded-[1.5rem] flex items-center justify-center hover:bg-emerald-700 disabled:opacity-50 shadow-lg transition-all active:scale-95"><i className="fas fa-paper-plane"></i></button>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Add Field Modal */}
       {showAddFieldModal && (
