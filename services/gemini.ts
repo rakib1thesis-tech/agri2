@@ -3,21 +3,18 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { Field, SensorData } from "../types";
 
 /**
- * Safely checks if an API key is available via environment or manual submission.
+ * Safely checks if an API key is available via environment.
  */
 export const checkAIConnection = () => {
-  const userKey = localStorage.getItem('agricare_user_api_key');
-  return !!(userKey || process.env.API_KEY);
+  return !!process.env.API_KEY;
 };
 
 /**
- * Creates a new GoogleGenAI client instance.
- * Checks for a manually submitted key first, then falls back to process.env.API_KEY.
+ * Creates a new GoogleGenAI client instance using the environment API_KEY.
+ * Always creates a new instance right before making an API call for consistency.
  */
 const getAIClient = () => {
-  const userKey = localStorage.getItem('agricare_user_api_key');
-  const apiKey = userKey || process.env.API_KEY;
-  
+  const apiKey = process.env.API_KEY;
   if (!apiKey) {
     throw new Error("API_KEY_MISSING");
   }
@@ -83,7 +80,8 @@ export const getCropAnalysis = async (field: Field, latestData: SensorData) => {
       }
     });
     
-    const result = JSON.parse(response.text || '[]');
+    const text = response.text;
+    const result = JSON.parse(text || '[]');
     return result.length > 0 ? result : getFallbackRecommendations();
   } catch (error) {
     console.error("Gemini Analysis Error:", error);
@@ -139,7 +137,8 @@ export const getDetailedManagementPlan = async (field: Field, latestData: Sensor
       }
     });
     
-    const result = JSON.parse(response.text || '[]');
+    const text = response.text;
+    const result = JSON.parse(text || '[]');
     return result.length > 0 ? result : getFallbackPlan();
   } catch (error) {
     console.error("Gemini Plan Error:", error);

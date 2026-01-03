@@ -38,22 +38,13 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [userInput, setUserInput] = useState("");
   const [isBotThinking, setIsBotThinking] = useState(false);
-  const [showManualConsole, setShowManualConsole] = useState(false);
-  const [manualKey, setManualKey] = useState("");
   
   const chatRef = useRef<any>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const verifyAI = async () => {
-      const aistudio = (window as any).aistudio;
-      let hasKey = false;
-      if (aistudio) {
-        hasKey = await aistudio.hasSelectedApiKey();
-      }
-      setAiConnected(hasKey || checkAIConnection());
-    };
-    verifyAI();
+    // Rely on centralized environment check for AI status
+    setAiConnected(checkAIConnection());
 
     const saved = localStorage.getItem('agricare_fields');
     if (saved) {
@@ -111,6 +102,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
   };
 
   const initChat = (field: Field) => {
+    if (!aiConnected) return;
     const latest = getFieldCurrentStats(field);
     chatRef.current = startAIConversation(
       `You are the Agricare AI Advisor. Assist this farmer in ${field.location} with their ${field.field_name} (${field.soil_type} soil).
@@ -166,41 +158,6 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
     setNewFieldData({ name: '', location: '', size: '', soilType: 'Loamy' });
   };
 
-  const handleManualKeySubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!manualKey.trim()) return;
-    localStorage.setItem('agricare_user_api_key', manualKey.trim());
-    setAiConnected(true);
-    setShowManualConsole(false);
-    if (selectedField) {
-      initChat(selectedField);
-      handleFieldSelect(selectedField);
-    }
-  };
-
-  const handleConnectAI = async () => {
-    const aistudio = (window as any).aistudio;
-    if (aistudio) {
-      try {
-        await aistudio.openSelectKey();
-        const hasKey = await aistudio.hasSelectedApiKey();
-        if (hasKey) {
-          setAiConnected(true);
-          if (selectedField) {
-            initChat(selectedField);
-            handleFieldSelect(selectedField);
-          }
-        } else {
-          setShowManualConsole(true);
-        }
-      } catch (e) {
-        setShowManualConsole(true);
-      }
-    } else {
-      setShowManualConsole(true);
-    }
-  };
-
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userInput.trim() || isBotThinking) return;
@@ -211,15 +168,15 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
     setUserInput("");
     setChatHistory(prev => [...prev, { role: 'user', text: userMsg }]);
     if (!chatRef.current) {
-      setChatHistory(prev => [...prev, { role: 'model', text: "Connection error. Recheck API key." }]);
+      setChatHistory(prev => [...prev, { role: 'model', text: "Connection error. AI service is temporarily unavailable." }]);
       return;
     }
     setIsBotThinking(true);
     try {
       const response: GenerateContentResponse = await chatRef.current.sendMessage({ message: userMsg });
-      setChatHistory(prev => [...prev, { role: 'model', text: response.text || "No response." }]);
+      setChatHistory(prev => [...prev, { role: 'model', text: response.text || "No response received." }]);
     } catch (error) {
-      setChatHistory(prev => [...prev, { role: 'model', text: "API Error." }]);
+      setChatHistory(prev => [...prev, { role: 'model', text: "Service Error. Please ensure the backend configuration is correct." }]);
     } finally {
       setIsBotThinking(false);
     }
@@ -298,13 +255,17 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                     <div className="flex items-center gap-3 mb-2">
                       <div className={`w-8 h-8 ${aiConnected ? 'bg-emerald-500' : 'bg-slate-700'} rounded-lg flex items-center justify-center transition-colors`}><i className="fas fa-robot text-sm"></i></div>
                       <span className={`text-xs font-bold uppercase tracking-widest ${aiConnected ? 'text-emerald-400' : 'text-slate-500'}`}>
-                        {aiConnected ? 'AI Advisor Online' : 'AI Advisor Offline'}
+                        {aiConnected ? 'AI Advisor Online' : 'AI Advisor Unavailable'}
                       </span>
                     </div>
                     <h2 className="text-4xl font-black">{selectedField.field_name}</h2>
                     <p className="text-slate-400 mt-1">{selectedField.location} • {selectedField.size} Hectares</p>
                   </div>
-                  <button onClick={() => setIsChatOpen(true)} className="bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-3 rounded-2xl font-bold flex items-center gap-3 transition-all transform hover:-translate-y-0.5">
+                  <button 
+                    onClick={() => setIsChatOpen(true)} 
+                    disabled={!aiConnected}
+                    className="bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-700 text-white px-8 py-3 rounded-2xl font-bold flex items-center gap-3 transition-all transform hover:-translate-y-0.5"
+                  >
                     <i className="fas fa-comment-medical text-lg"></i> Consult Advisor
                   </button>
                 </div>
@@ -320,7 +281,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                   <div className="lg:col-span-2 space-y-8">
                     <div className="bg-white p-8 rounded-[2rem] border border-emerald-100 shadow-sm relative group overflow-hidden">
                       <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-3"><i className="fas fa-dna text-emerald-600"></i> AI Soil Health Insight</h3>
-                      <p className="text-slate-600 leading-relaxed whitespace-pre-line text-lg font-medium">{aiSummary || "Analysing..."}</p>
+                      <p className="text-slate-600 leading-relaxed whitespace-pre-line text-lg font-medium">{aiSummary || "Analysing soil markers..."}</p>
                     </div>
 
                     <div>
@@ -343,7 +304,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
 
                   <div className="lg:col-span-1">
                     <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
-                      <h3 className="text-xl font-bold text-slate-900 mb-8 flex items-center gap-3"><i className="fas fa-list-check text-emerald-600"></i> Roadmap</h3>
+                      <h3 className="text-xl font-bold text-slate-900 mb-8 flex items-center gap-3"><i className="fas fa-list-check text-emerald-600"></i> Localized Roadmap</h3>
                       <div className="space-y-6">
                         {managementPlan?.map((task, i) => (
                           <div key={i} className="relative pl-6">
@@ -363,7 +324,6 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
         </div>
       </div>
 
-      {/* Manual AI Console in Chat Panel */}
       {isChatOpen && (
         <div className="fixed inset-0 z-[400] flex justify-end">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setIsChatOpen(false)}></div>
@@ -376,38 +336,82 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
               <button onClick={() => setIsChatOpen(false)} className="w-10 h-10 rounded-full hover:bg-white/10 flex items-center justify-center transition-colors"><i className="fas fa-times text-xl"></i></button>
             </div>
             <div ref={scrollRef} className="flex-1 overflow-y-auto p-8 space-y-6 scroll-smooth">
-              {!aiConnected ? (
+              {chatHistory.length === 0 && (
                 <div className="text-center py-20 px-8 flex flex-col items-center">
-                  <i className="fas fa-plug text-amber-500 text-3xl mb-6"></i>
-                  <h4 className="font-bold text-slate-900 mb-2">Advisor Offline</h4>
-                  {showManualConsole ? (
-                    <form onSubmit={handleManualKeySubmit} className="w-full space-y-4">
-                      <textarea rows={3} value={manualKey} onChange={(e) => setManualKey(e.target.value)} placeholder="Paste API code..." className="w-full px-4 py-3 rounded-xl border outline-none text-sm font-mono" />
-                      <div className="flex gap-2">
-                        <button type="submit" className="flex-1 bg-emerald-600 text-white py-3 rounded-xl font-bold text-sm">Submit Code</button>
-                        <button type="button" onClick={() => setShowManualConsole(false)} className="px-4 py-3 bg-slate-100 text-slate-500 rounded-xl font-bold text-sm">Back</button>
-                      </div>
-                    </form>
-                  ) : (
-                    <button onClick={handleConnectAI} className="bg-slate-900 text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-800">
-                      <i className="fas fa-key"></i> Connect Gemini AI
-                    </button>
-                  )}
-                </div>
-              ) : (
-                chatHistory.map((msg, i) => (
-                  <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[90%] p-5 rounded-3xl text-sm leading-relaxed ${msg.role === 'user' ? 'bg-emerald-600 text-white rounded-br-none shadow-lg' : 'bg-slate-100 text-slate-800 rounded-bl-none border border-slate-200'}`}>{msg.text}</div>
+                  <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-3xl flex items-center justify-center mb-6">
+                    <i className="fas fa-comment-dots text-2xl"></i>
                   </div>
-                ))
+                  <h4 className="font-bold text-slate-900 mb-2">How can I help you today?</h4>
+                  <p className="text-sm text-slate-500">Ask about crop disease, irrigation, or fertilizer management.</p>
+                </div>
+              )}
+              {chatHistory.map((msg, i) => (
+                <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[90%] p-5 rounded-3xl text-sm leading-relaxed ${msg.role === 'user' ? 'bg-emerald-600 text-white rounded-br-none shadow-lg' : 'bg-slate-100 text-slate-800 rounded-bl-none border border-slate-200'}`}>{msg.text}</div>
+                </div>
+              ))}
+              {isBotThinking && (
+                <div className="flex justify-start">
+                  <div className="bg-slate-100 p-5 rounded-3xl rounded-bl-none border border-slate-200">
+                    <div className="flex gap-1">
+                      <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"></span>
+                      <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce delay-75"></span>
+                      <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce delay-150"></span>
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
-            <div className={`p-8 border-t bg-slate-50 ${!aiConnected ? 'opacity-40 pointer-events-none' : ''}`}>
+            <div className={`p-8 border-t bg-slate-50`}>
               <form onSubmit={handleSendMessage} className="flex gap-3">
-                <input type="text" value={userInput} onChange={(e) => setUserInput(e.target.value)} placeholder="Ask advisor..." className="flex-1 bg-white border rounded-[1.5rem] px-6 py-4 text-sm outline-none" disabled={!aiConnected} />
-                <button type="submit" disabled={isBotThinking || !userInput.trim() || !aiConnected} className="w-14 h-14 bg-emerald-600 text-white rounded-[1.5rem] flex items-center justify-center hover:bg-emerald-700 disabled:opacity-50 shadow-lg"><i className="fas fa-paper-plane"></i></button>
+                <input 
+                  type="text" 
+                  value={userInput} 
+                  onChange={(e) => setUserInput(e.target.value)} 
+                  placeholder="Ask your advisor anything..." 
+                  className="flex-1 bg-white border rounded-[1.5rem] px-6 py-4 text-sm outline-none focus:ring-2 focus:ring-emerald-500 border-slate-200" 
+                />
+                <button type="submit" disabled={isBotThinking || !userInput.trim()} className="w-14 h-14 bg-emerald-600 text-white rounded-[1.5rem] flex items-center justify-center hover:bg-emerald-700 disabled:opacity-50 shadow-lg transition-all active:scale-95"><i className="fas fa-paper-plane"></i></button>
               </form>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Field Modal */}
+      {showAddFieldModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl w-full max-w-md p-8 shadow-2xl animate-in zoom-in duration-200">
+            <h2 className="text-2xl font-bold mb-6">Register New Field</h2>
+            <form onSubmit={handleAddField} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase mb-1 ml-1">Field Name</label>
+                <input required type="text" value={newFieldData.name} onChange={e => setNewFieldData({...newFieldData, name: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500" placeholder="e.g. South Paddy Field" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase mb-1 ml-1">District / Location</label>
+                <input required type="text" value={newFieldData.location} onChange={e => setNewFieldData({...newFieldData, location: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500" placeholder="e.g. Bogura, Bangladesh" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase mb-1 ml-1">Size (ha)</label>
+                  <input required type="number" step="0.1" value={newFieldData.size} onChange={e => setNewFieldData({...newFieldData, size: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500" placeholder="5.2" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase mb-1 ml-1">Soil Type</label>
+                  <select value={newFieldData.soilType} onChange={e => setNewFieldData({...newFieldData, soilType: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500">
+                    <option value="Loamy">Loamy</option>
+                    <option value="Clay">Clay</option>
+                    <option value="Sandy">Sandy</option>
+                    <option value="Alluvial">Alluvial</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex gap-3 pt-4">
+                <button type="button" onClick={() => setShowAddFieldModal(false)} className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-xl font-bold transition-colors">Cancel</button>
+                <button type="submit" className="flex-1 py-4 bg-emerald-600 text-white rounded-xl font-bold shadow-lg shadow-emerald-200 transition-all hover:bg-emerald-700">Create Field</button>
+              </div>
+            </form>
           </div>
         </div>
       )}
