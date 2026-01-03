@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { User, Field } from '../types';
+import { registerUser, addFieldToDb } from '../services/db';
 
 interface SignupProps {
   onSignup: (user: User) => void;
@@ -8,52 +9,50 @@ interface SignupProps {
 }
 
 const Signup: React.FC<SignupProps> = ({ onSignup, onSwitchToLogin }) => {
+  const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
     plan: 'premium',
-    // Field Setup
     fieldName: '',
     location: '',
     size: '',
     soilType: 'Loamy'
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
     
-    const userId = Math.random().toString(36).substr(2, 9);
-    
-    const newUser: User = {
-      id: userId,
-      name: formData.name,
-      email: formData.email,
-      subscriptionPlan: formData.plan as any,
-      subscriptionEnd: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0]
-    };
+    try {
+      const tempUser: User = {
+        id: '', // Will be assigned by Firebase
+        name: formData.name,
+        email: formData.email,
+        subscriptionPlan: formData.plan as any,
+        subscriptionEnd: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0]
+      };
 
-    // Create the initial field for the user
-    const initialField: Field = {
-      field_id: Math.floor(Math.random() * 10000),
-      user_id: userId,
-      field_name: formData.fieldName || 'My First Field',
-      location: formData.location || 'Bangladesh',
-      size: parseFloat(formData.size) || 1.0,
-      soil_type: formData.soilType
-    };
+      const newUser = await registerUser(tempUser, formData.password);
 
-    // Persistence: Register the User
-    const registeredUsers = JSON.parse(localStorage.getItem('agricare_registered_users') || '[]');
-    if (!registeredUsers.find((u: User) => u.email === formData.email)) {
-      localStorage.setItem('agricare_registered_users', JSON.stringify([...registeredUsers, newUser]));
+      // Create the initial field for the user
+      const initialField: Field = {
+        field_id: Math.floor(Math.random() * 100000),
+        user_id: newUser.id,
+        field_name: formData.fieldName || 'My First Field',
+        location: formData.location || 'Bangladesh',
+        size: parseFloat(formData.size) || 1.0,
+        soil_type: formData.soilType
+      };
+
+      await addFieldToDb(initialField);
+      onSignup(newUser);
+    } catch (error: any) {
+      alert("Signup Error: " + (error.message || "Could not create account."));
+    } finally {
+      setIsLoading(false);
     }
-    
-    // Persistence: Register the Field
-    const existingFields = JSON.parse(localStorage.getItem('agricare_fields') || '[]');
-    localStorage.setItem('agricare_fields', JSON.stringify([...existingFields, initialField]));
-    
-    onSignup(newUser);
   };
 
   return (
@@ -64,11 +63,10 @@ const Signup: React.FC<SignupProps> = ({ onSignup, onSwitchToLogin }) => {
             <i className="fas fa-user-plus text-white text-2xl"></i>
           </div>
           <h2 className="text-3xl font-black text-slate-900">Start Your Agri-Journey</h2>
-          <p className="mt-2 text-sm text-slate-500">Create your account and set up your first field in minutes.</p>
+          <p className="mt-2 text-sm text-slate-500">Create your cloud-synced account in minutes.</p>
         </div>
         
         <form className="mt-8 space-y-10" onSubmit={handleSubmit}>
-          {/* Section 1: Personal Info */}
           <div className="space-y-6">
             <div className="flex items-center gap-3 mb-2">
               <span className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold">1</span>
@@ -126,7 +124,6 @@ const Signup: React.FC<SignupProps> = ({ onSignup, onSwitchToLogin }) => {
             </div>
           </div>
 
-          {/* Section 2: Farm Info */}
           <div className="space-y-6 pt-4 border-t border-slate-100">
             <div className="flex items-center gap-3 mb-2">
               <span className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold">2</span>
@@ -188,15 +185,12 @@ const Signup: React.FC<SignupProps> = ({ onSignup, onSwitchToLogin }) => {
             </div>
           </div>
 
-          <div className="bg-emerald-50 p-4 rounded-2xl text-[11px] text-emerald-800 leading-relaxed border border-emerald-100 flex gap-3 items-start">
-            <i className="fas fa-info-circle mt-0.5"></i>
-            <span>By clicking "Create Account", you agree to our Terms of Service. You will receive 30 days of Premium AI insights for free to analyze your first field.</span>
-          </div>
-
           <button
             type="submit"
-            className="group relative w-full flex justify-center py-4 px-4 border border-transparent text-sm font-black rounded-2xl text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 shadow-xl shadow-emerald-200 transition-all transform hover:-translate-y-0.5 active:scale-95"
+            disabled={isLoading}
+            className="group relative w-full flex justify-center py-4 px-4 border border-transparent text-sm font-black rounded-2xl text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 shadow-xl shadow-emerald-200 transition-all transform hover:-translate-y-0.5 active:scale-95 disabled:opacity-50"
           >
+            {isLoading ? <i className="fas fa-spinner fa-spin mr-2"></i> : null}
             Deploy My Farm Dashboard
           </button>
         </form>

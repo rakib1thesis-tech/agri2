@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { User } from '../types';
+import { loginUser } from '../services/db';
 
 interface LoginProps {
   onLogin: (user: User) => void;
@@ -10,21 +11,23 @@ interface LoginProps {
 const Login: React.FC<LoginProps> = ({ onLogin, onSwitchToSignup }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
     
-    // Retrieve the registered users from localStorage
-    const registeredUsers = JSON.parse(localStorage.getItem('agricare_registered_users') || '[]');
-    const existingUser = registeredUsers.find((u: User) => u.email.toLowerCase() === email.toLowerCase());
-
-    if (existingUser) {
-      // Simulate successful auth with the actual user data
-      onLogin(existingUser);
-    } else {
-      // If not found, we can either alert or provide a default for demo purposes
-      // But let's be accurate as requested:
-      alert("No account found with this email. Please sign up first to access the dashboard.");
+    try {
+      const user = await loginUser(email, password);
+      if (user) {
+        onLogin(user);
+      } else {
+        alert("Account not found. Please sign up first.");
+      }
+    } catch (error: any) {
+      alert("Login Error: " + (error.message || "Please check your credentials and connection."));
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -36,7 +39,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onSwitchToSignup }) => {
             <i className="fas fa-leaf text-white text-2xl"></i>
           </div>
           <h2 className="text-3xl font-extrabold text-slate-900">স্বাগতম (Welcome Back)</h2>
-          <p className="mt-2 text-sm text-slate-500">Sign in to manage your fields in Bangladesh</p>
+          <p className="mt-2 text-sm text-slate-500">Sign in to manage your fields across all browsers</p>
         </div>
         
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
@@ -65,18 +68,12 @@ const Login: React.FC<LoginProps> = ({ onLogin, onSwitchToSignup }) => {
             </div>
           </div>
 
-          <div className="flex items-center justify-between text-sm">
-            <div className="flex items-center">
-              <input type="checkbox" className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-slate-300 rounded" />
-              <label className="ml-2 block text-slate-700">Remember me</label>
-            </div>
-            <a href="#" className="font-medium text-emerald-600 hover:text-emerald-500">Forgot password?</a>
-          </div>
-
           <button
             type="submit"
-            className="group relative w-full flex justify-center py-4 px-4 border border-transparent text-sm font-bold rounded-xl text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 shadow-lg shadow-emerald-100 transition-all active:scale-95"
+            disabled={isLoading}
+            className="group relative w-full flex justify-center py-4 px-4 border border-transparent text-sm font-bold rounded-xl text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 shadow-lg shadow-emerald-100 transition-all active:scale-95 disabled:opacity-50"
           >
+            {isLoading ? <i className="fas fa-spinner fa-spin mr-2"></i> : null}
             Sign In
           </button>
         </form>
