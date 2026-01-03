@@ -2,17 +2,10 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Field, SensorData } from "../types";
 
-/**
- * Safely checks if an API key is available via environment.
- */
 export const checkAIConnection = () => {
   return !!process.env.API_KEY;
 };
 
-/**
- * Creates a new GoogleGenAI client instance using the environment API_KEY.
- * Always creates a new instance right before making an API call for consistency.
- */
 const getAIClient = () => {
   const apiKey = process.env.API_KEY;
   if (!apiKey) {
@@ -21,31 +14,19 @@ const getAIClient = () => {
   return new GoogleGenAI({ apiKey });
 };
 
-export const getLiveWeatherAlert = async (location: string) => {
-  try {
-    const ai = getAIClient();
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `What is the current weather forecast and any active agricultural weather alerts for ${location}, Bangladesh today? Provide a concise summary for a farmer.`,
-      config: {
-        tools: [{ googleSearch: {} }],
-      },
-    });
-
-    const text = response.text || "No active alerts for this region.";
-    const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-    
-    return { text, sources };
-  } catch (error: any) {
-    console.error("Gemini Weather Error:", error);
-    return { 
-      text: "Weather data is temporarily unavailable. Local patterns suggest standard seasonal monitoring.", 
-      sources: [] 
-    };
-  }
+/**
+ * Format sensor values for the AI prompt, clearly marking missing data.
+ */
+const formatDataForPrompt = (data: any) => {
+  return `
+    - Temperature: ${data.temperature !== null ? `${data.temperature.toFixed(1)}°C` : 'NOT PROVIDED'}
+    - Moisture: ${data.moisture !== null ? `${data.moisture.toFixed(1)}%` : 'NOT PROVIDED'}
+    - pH Level: ${data.ph_level !== null ? `${data.ph_level.toFixed(1)}` : 'NOT PROVIDED'}
+    - NPK Profile: ${data.npk_n !== null ? `N=${data.npk_n}, P=${data.npk_p}, K=${data.npk_k}` : 'NOT PROVIDED (Nutrient data missing)'}
+  `;
 };
 
-export const getCropAnalysis = async (field: Field, latestData: SensorData) => {
+export const getCropAnalysis = async (field: Field, latestData: any) => {
   try {
     const ai = getAIClient();
     const response = await ai.models.generateContent({
@@ -53,13 +34,9 @@ export const getCropAnalysis = async (field: Field, latestData: SensorData) => {
       contents: `
         Analyze this agricultural field data and provide the top 3 recommended crops.
         Field: ${field.field_name}, Location: ${field.location}, Soil: ${field.soil_type}.
-        Latest Soil Data: 
-        - Temperature: ${latestData.temperature.toFixed(1)}°C
-        - Moisture: ${latestData.moisture.toFixed(1)}%
-        - pH Level: ${latestData.ph_level.toFixed(1)}
-        - NPK Profile: N=${latestData.npk_n}, P=${latestData.npk_p}, K=${latestData.npk_k}
+        Available Soil Data: ${formatDataForPrompt(latestData)}
         
-        Focus on these markers to determine growth suitability in the context of Bangladesh.
+        CRITICAL INSTRUCTION: If certain data points (like NPK or pH) are marked as 'NOT PROVIDED', do not assume values. Base your recommendations ONLY on available data and state if missing data makes recommendations less certain.
       `,
       config: {
         responseMimeType: "application/json",
@@ -70,9 +47,9 @@ export const getCropAnalysis = async (field: Field, latestData: SensorData) => {
             properties: {
               name: { type: Type.STRING },
               suitability: { type: Type.NUMBER, description: "Percentage 0-100" },
-              yield: { type: Type.STRING, description: "Expected yield estimate" },
-              requirements: { type: Type.STRING, description: "Key growth requirements" },
-              icon: { type: Type.STRING, description: "FontAwesome icon class string e.g. fa-leaf" }
+              yield: { type: Type.STRING },
+              requirements: { type: Type.STRING },
+              icon: { type: Type.STRING }
             },
             required: ["name", "suitability", "yield", "requirements", "icon"]
           }
@@ -80,44 +57,44 @@ export const getCropAnalysis = async (field: Field, latestData: SensorData) => {
       }
     });
     
-    const text = response.text;
-    const result = JSON.parse(text || '[]');
-    return result.length > 0 ? result : getFallbackRecommendations();
+    return JSON.parse(response.text || '[]');
   } catch (error) {
     console.error("Gemini Analysis Error:", error);
-    return getFallbackRecommendations();
+    return [];
   }
 };
 
-export const getSoilHealthSummary = async (field: Field, latestData: SensorData) => {
+export const getSoilHealthSummary = async (field: Field, latestData: any) => {
   try {
     const ai = getAIClient();
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `
-        Act as an expert agricultural scientist. Provide a concise 3-sentence "Soil Health Summary" for this field in Bangladesh.
+        Act as an expert agricultural scientist. Provide a concise 3-sentence "Soil Health Summary".
         Field: ${field.field_name}, Location: ${field.location}, Soil: ${field.soil_type}.
-        Latest Markers: Temp: ${latestData.temperature.toFixed(1)}°C, Moisture: ${latestData.moisture.toFixed(1)}%, pH: ${latestData.ph_level.toFixed(1)}, NPK: ${latestData.npk_n}-${latestData.npk_p}-${latestData.npk_k}.
+        Current Data: ${formatDataForPrompt(latestData)}
         
-        Focus on the current status and suggest one prioritized action. No markdown formatting.
+        IMPORTANT: Only mention parameters provided in the data. If NPK or pH is missing, explicitly state that these parameters need to be measured for a complete health assessment. No markdown.
       `
     });
     
-    return response.text || "Soil conditions are currently stable for the region.";
+    return response.text || "Soil state undetermined due to missing data.";
   } catch (error) {
     console.error("Gemini Summary Error:", error);
-    return "Soil health markers are within expected ranges for the current season.";
+    return "Unable to generate summary at this time.";
   }
 };
 
-export const getDetailedManagementPlan = async (field: Field, latestData: SensorData) => {
+export const getDetailedManagementPlan = async (field: Field, latestData: any) => {
   try {
     const ai = getAIClient();
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
       contents: `
-        Generate exactly 4 prioritized farm management tasks for a field in Bangladesh with these conditions:
-        Soil: ${field.soil_type}, Temp: ${latestData.temperature}°C, Moisture: ${latestData.moisture}%, pH: ${latestData.ph_level}, NPK: ${latestData.npk_n}-${latestData.npk_p}-${latestData.npk_k}.
+        Generate exactly 4 prioritized farm management tasks.
+        Data: ${formatDataForPrompt(latestData)}
+        
+        INSTRUCTION: If data is missing (e.g., NPK not provided), one of your High priority tasks MUST be 'Measure Soil Nutrients'. Do not make up fertilizer recommendations if nutrient data is missing.
       `,
       config: {
         responseMimeType: "application/json",
@@ -126,10 +103,10 @@ export const getDetailedManagementPlan = async (field: Field, latestData: Sensor
           items: {
             type: Type.OBJECT,
             properties: {
-              priority: { type: Type.STRING, description: "High, Medium, or Low" },
+              priority: { type: Type.STRING },
               title: { type: Type.STRING },
               description: { type: Type.STRING },
-              icon: { type: Type.STRING, description: "FontAwesome icon class" }
+              icon: { type: Type.STRING }
             },
             required: ["priority", "title", "description", "icon"]
           }
@@ -137,12 +114,10 @@ export const getDetailedManagementPlan = async (field: Field, latestData: Sensor
       }
     });
     
-    const text = response.text;
-    const result = JSON.parse(text || '[]');
-    return result.length > 0 ? result : getFallbackPlan();
+    return JSON.parse(response.text || '[]');
   } catch (error) {
     console.error("Gemini Plan Error:", error);
-    return getFallbackPlan();
+    return [];
   }
 };
 
@@ -151,31 +126,9 @@ export const startAIConversation = (systemInstruction: string) => {
     const ai = getAIClient();
     return ai.chats.create({
       model: 'gemini-3-flash-preview',
-      config: { 
-        systemInstruction,
-        temperature: 0.7 
-      },
+      config: { systemInstruction, temperature: 0.7 },
     });
   } catch (e: any) {
-    console.error("Failed to start chat session:", e);
     return null;
   }
 };
-
-// Fallback Data Generators
-function getFallbackRecommendations() {
-  return [
-    { name: "Rice (Boro)", suitability: 92, yield: "5.8 tons/ha", requirements: "Maintain high water level during tillering phase.", icon: "fa-wheat-awn" },
-    { name: "Mustard", suitability: 85, yield: "1.2 tons/ha", requirements: "Thrives in current loamy/alluvial conditions. Low water need.", icon: "fa-seedling" },
-    { name: "Potato", suitability: 78, yield: "24 tons/ha", requirements: "Ensure soil pH stays below 6.5 to prevent scab disease.", icon: "fa-circle" }
-  ];
-}
-
-function getFallbackPlan() {
-  return [
-    { priority: "High", title: "Moisture Maintenance", description: "Soil moisture is trending low; schedule next irrigation for early morning.", icon: "fa-droplet" },
-    { priority: "Medium", title: "NPK Supplement", description: "Potassium levels are slightly low for optimal yield. Add K-based fertilizer.", icon: "fa-flask" },
-    { priority: "Medium", title: "pH Adjustment", description: "Current pH is 6.8. Monitor closely if planning to plant acid-loving crops.", icon: "fa-vial" },
-    { priority: "Low", title: "Pest Scouting", description: "No immediate threats, but check leaf undersides for aphid colonies.", icon: "fa-bug" }
-  ];
-}

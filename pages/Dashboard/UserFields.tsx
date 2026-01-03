@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { User, Field, SensorData, CropRecommendation, Sensor } from '../../types';
-import { generateMockSensorData } from '../../constants';
 import { getCropAnalysis, getSoilHealthSummary, getDetailedManagementPlan, checkAIConnection } from '../../services/gemini';
 import { syncFields, syncSensorsFromDb, addFieldToDb, getManualDiagnosticsForFields } from '../../services/db';
 
@@ -21,6 +20,9 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
   const [loading, setLoading] = useState(false);
   const [aiConnected, setAiConnected] = useState(true);
   
+  // Track what data is actually available for the UI
+  const [currentDataState, setCurrentDataState] = useState<any>(null);
+
   const [showAddFieldModal, setShowAddFieldModal] = useState(false);
   const [newFieldData, setNewFieldData] = useState({
     name: '',
@@ -38,34 +40,39 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
     loadData();
   }, [user.id]);
 
-  const getFieldCurrentStats = async (field: Field): Promise<SensorData> => {
-    // 1. Get Live Sensors from DB
+  /**
+   * Fetches ONLY real data from Sensors and Manual entries.
+   * No mock data is used here.
+   */
+  const getFieldCurrentStats = async (field: Field): Promise<any> => {
     const fieldSensors = await syncSensorsFromDb([field]);
-    
-    // 2. Get Manual Diagnostics from DB
     const manualDiags = await getManualDiagnosticsForFields([field.field_id]);
     const fieldManual = manualDiags[field.field_id];
 
-    // 3. Start with Mock Base
-    const mock = generateMockSensorData(field.field_id)[6];
-    const stats: SensorData = { ...mock };
+    // Initialize with nulls to represent "Not Measured"
+    const stats: any = {
+      temperature: null,
+      moisture: null,
+      ph_level: null,
+      npk_n: null,
+      npk_p: null,
+      npk_k: null
+    };
 
-    // 4. Layer Sensor Data (Priority 2)
-    if (fieldSensors.length > 0) {
-      fieldSensors.forEach(s => {
-        if (!s.last_reading) return;
-        if (s.sensor_type === 'Moisture') stats.moisture = s.last_reading.value ?? stats.moisture;
-        if (s.sensor_type === 'Temperature') stats.temperature = s.last_reading.value ?? stats.temperature;
-        if (s.sensor_type === 'PH Probe') stats.ph_level = s.last_reading.value ?? stats.ph_level;
-        if (s.sensor_type === 'NPK Analyzer') {
-          stats.npk_n = s.last_reading.n ?? stats.npk_n;
-          stats.npk_p = s.last_reading.p ?? stats.npk_p;
-          stats.npk_k = s.last_reading.k ?? stats.npk_k;
-        }
-      });
-    }
+    // 1. Apply Sensor Data
+    fieldSensors.forEach(s => {
+      if (!s.last_reading) return;
+      if (s.sensor_type === 'Moisture') stats.moisture = s.last_reading.value;
+      if (s.sensor_type === 'Temperature') stats.temperature = s.last_reading.value;
+      if (s.sensor_type === 'PH Probe') stats.ph_level = s.last_reading.value;
+      if (s.sensor_type === 'NPK Analyzer') {
+        stats.npk_n = s.last_reading.n;
+        stats.npk_p = s.last_reading.p;
+        stats.npk_k = s.last_reading.k;
+      }
+    });
 
-    // 5. Layer Manual Data (Priority 1 - Highest Override)
+    // 2. Apply Manual Overrides (Highest Priority)
     if (fieldManual) {
       if (fieldManual.moisture !== undefined) stats.moisture = fieldManual.moisture;
       if (fieldManual.temp !== undefined) stats.temperature = fieldManual.temp;
@@ -86,6 +93,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
     setManagementPlan(null);
     
     const latest = await getFieldCurrentStats(field);
+    setCurrentDataState(latest);
     
     try {
       const [analysis, summary, plan] = await Promise.all([
@@ -121,39 +129,16 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
     setNewFieldData({ name: '', location: '', size: '', soilType: 'Loamy' });
   };
 
-  const handleExportCSV = async () => {
-    if (!selectedField) return;
-    const historicalData = generateMockSensorData(selectedField.field_id);
-    const headers = ['Timestamp', 'Temp (°C)', 'Moisture (%)', 'pH', 'N', 'P', 'K'];
-    const rows = historicalData.map(row => [
-      row.timestamp, row.temperature.toFixed(2), row.moisture.toFixed(2), row.ph_level.toFixed(2), row.npk_n, row.npk_p, row.npk_k
-    ]);
-    const csvContent = [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `agricare_${selectedField.field_name}.csv`);
-    link.click();
-  };
-
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative min-h-[80vh]">
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Field Command Center</h1>
-          <p className="text-slate-500 text-sm">Real-time Cloud Analysis & Recommendations</p>
+          <p className="text-slate-500 text-sm">Strictly analyzing data from your sensor network.</p>
         </div>
-        <div className="flex gap-4">
-          {selectedField && (
-            <button onClick={handleExportCSV} className="bg-white text-emerald-600 border border-emerald-100 px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-emerald-50 shadow-sm">
-              <i className="fas fa-file-csv"></i> Export Data
-            </button>
-          )}
-          <button onClick={() => setShowAddFieldModal(true)} className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-emerald-700 shadow-md">
-            <i className="fas fa-plus"></i> Add New Field
-          </button>
-        </div>
+        <button onClick={() => setShowAddFieldModal(true)} className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-emerald-700 shadow-md">
+          <i className="fas fa-plus"></i> Add New Field
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
@@ -183,7 +168,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                 <i className="fas fa-satellite text-3xl"></i>
               </div>
               <h2 className="text-2xl font-bold text-slate-800">Field Diagnostics Ready</h2>
-              <p className="text-slate-500 mt-2 max-w-sm mx-auto">Select a field to initialize Gemini-driven analysis based on your cloud-synced data.</p>
+              <p className="text-slate-500 mt-2 max-w-sm mx-auto">Select a field to initialize AI analysis based on your actual sensor readings.</p>
             </div>
           ) : (
             <div className="space-y-8 animate-in fade-in slide-in-from-right-4">
@@ -200,20 +185,33 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                     <h2 className="text-4xl font-black">{selectedField.field_name}</h2>
                     <p className="text-slate-400 mt-1">{selectedField.location} • {selectedField.size} Hectares</p>
                   </div>
+                  
+                  {/* Current Real Data Inventory */}
+                  <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl flex gap-4 text-[10px] font-bold uppercase tracking-wider">
+                    <div className={currentDataState?.moisture !== null ? 'text-emerald-400' : 'text-slate-500'}>
+                      <i className="fas fa-droplet mr-1"></i> Moisture: {currentDataState?.moisture !== null ? 'Live' : 'No Data'}
+                    </div>
+                    <div className={currentDataState?.ph_level !== null ? 'text-emerald-400' : 'text-slate-500'}>
+                      <i className="fas fa-flask mr-1"></i> pH: {currentDataState?.ph_level !== null ? 'Live' : 'No Data'}
+                    </div>
+                    <div className={currentDataState?.npk_n !== null ? 'text-emerald-400' : 'text-slate-500'}>
+                      <i className="fas fa-vial mr-1"></i> NPK: {currentDataState?.npk_n !== null ? 'Live' : 'No Data'}
+                    </div>
+                  </div>
                 </div>
               </div>
 
               {loading ? (
                 <div className="bg-white p-24 text-center rounded-[3rem] border border-slate-100 shadow-sm">
                   <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-8"></div>
-                  <h3 className="text-2xl font-bold text-slate-800">Syncing with Cloud Diagnostics...</h3>
+                  <h3 className="text-2xl font-bold text-slate-800">Strict Data Synthesis...</h3>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-12">
                   <div className="lg:col-span-2 space-y-8">
                     <div className="bg-white p-8 rounded-[2rem] border border-emerald-100 shadow-sm relative group overflow-hidden">
                       <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-3"><i className="fas fa-dna text-emerald-600"></i> AI Soil Health Insight</h3>
-                      <p className="text-slate-600 leading-relaxed whitespace-pre-line text-lg font-medium">{aiSummary || "Analysing soil markers..."}</p>
+                      <p className="text-slate-600 leading-relaxed whitespace-pre-line text-lg font-medium">{aiSummary || "Awaiting sensor data..."}</p>
                     </div>
 
                     <div>
