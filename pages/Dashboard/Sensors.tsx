@@ -10,7 +10,7 @@ const Sensors: React.FC<{ user: User }> = ({ user }) => {
   
   const [showAddModal, setShowAddModal] = useState(false);
   const [newSensorForm, setNewSensorForm] = useState({
-    type: 'Moisture/Temp',
+    type: 'Moisture',
     fieldId: ''
   });
 
@@ -194,10 +194,15 @@ const Sensors: React.FC<{ user: User }> = ({ user }) => {
             <form onSubmit={handleAddSensor} className="space-y-6">
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-2">Sensor Type</label>
-                <select className="w-full px-4 py-3 rounded-xl border border-slate-200" value={newSensorForm.type} onChange={e => setNewSensorForm({...newSensorForm, type: e.target.value})}>
-                  <option>Moisture/Temp</option>
-                  <option>NPK Analyzer</option>
-                  <option>PH Probe</option>
+                <select 
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200" 
+                  value={newSensorForm.type} 
+                  onChange={e => setNewSensorForm({...newSensorForm, type: e.target.value})}
+                >
+                  <option value="Moisture">Moisture</option>
+                  <option value="Temperature">Temperature</option>
+                  <option value="NPK Analyzer">NPK Analyzer</option>
+                  <option value="PH Probe">PH Probe</option>
                 </select>
               </div>
               <div>
