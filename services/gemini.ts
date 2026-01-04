@@ -26,7 +26,6 @@ const getAIClient = () => {
 
 /**
  * Format sensor values for the AI prompt.
- * Robust handling of null/undefined to ensure the AI knows what's real and what's inferred.
  */
 const formatDataForPrompt = (data: any) => {
   const safeVal = (val: any) => (val != null) ? Number(val).toFixed(2) : "MISSING";
@@ -41,8 +40,8 @@ const formatDataForPrompt = (data: any) => {
     - Potassium (K): ${safeVal(data.npk_k)} ppm
     
     CRITICAL CONTEXT:
-    If any data is marked "MISSING", use your domain expertise of ${data.location || 'Bangladesh'} and ${data.soil_type || 'Loamy'} soil to provide the best possible estimation. 
-    However, prioritize the real sensor readings for ${data.moisture != null ? 'Moisture' : ''} ${data.ph_level != null ? 'and pH' : ''}.
+    Use your domain expertise of ${data.location || 'Bangladesh'} and ${data.soil_type || 'Loamy'} soil to evaluate the health condition. 
+    Prioritize the real sensor readings provided.
   `;
 };
 
@@ -91,14 +90,16 @@ export const getSoilHealthSummary = async (field: Field, latestData: any) => {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `
-        Summarize the current soil health for ${field.field_name} in ${field.location}.
+        Examine the soil health condition for ${field.field_name} in ${field.location}.
         ${formatDataForPrompt({...latestData, location: field.location, soil_type: field.soil_type})}
         
-        Write exactly 3 sentences. Be scientific but accessible. If sensors show critical levels (e.g., very low moisture), highlight them first. Do not use markdown.
+        Based on these specific readings, provide a brief, professional idea of the current health state. 
+        Are the nutrients balanced? Is the moisture ideal? 
+        Write exactly 3 sentences. Do not use markdown.
       `
     });
     
-    return response.text || "Field diagnostics analyzed. Soil health markers are within expected seasonal ranges.";
+    return response.text || "Health diagnostics analyzed. Soil health markers are within expected seasonal ranges.";
   } catch (error: any) {
     console.error("Gemini Summary Error:", error);
     return "The AI engine is synthesizing your field data. Analysis will appear shortly.";
@@ -111,10 +112,10 @@ export const getDetailedManagementPlan = async (field: Field, latestData: any) =
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `
-        Generate 4 immediate management tasks for this field.
+        Based on the current data for ${field.field_name}, suggest 4 prioritized steps to make the crops and fields healthier.
         ${formatDataForPrompt({...latestData, location: field.location, soil_type: field.soil_type})}
         
-        Focus on immediate actions (Irrigation, pH correction, or Fertilizer application) based on the specific numbers provided.
+        Focus on soil restoration, precise nutrient application, and preventative maintenance.
       `,
       config: {
         responseMimeType: "application/json",

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { User, Field, Sensor } from '../../types';
-import { syncFields, syncSensorsFromDb, addOrUpdateSensorInDb, deleteSensorFromDb, saveManualDiagnostic, getManualDiagnosticsForFields } from '../../services/db';
+import { syncFields, syncSensorsFromDb, addOrUpdateSensorInDb, deleteSensorFromDb } from '../../services/db';
 
 const Sensors: React.FC<{ user: User }> = ({ user }) => {
   const [userFields, setUserFields] = useState<Field[]>([]);
@@ -10,7 +10,6 @@ const Sensors: React.FC<{ user: User }> = ({ user }) => {
   const [showUpdateModal, setShowUpdateModal] = useState<Sensor | null>(null);
   const [loading, setLoading] = useState(true);
   
-  const [manualDiagnostics, setManualDiagnostics] = useState<Record<number, any>>({});
   const [newSensorForm, setNewSensorForm] = useState({
     type: 'Moisture',
     fieldId: ''
@@ -26,12 +25,8 @@ const Sensors: React.FC<{ user: User }> = ({ user }) => {
       
       if (dbFields.length > 0) {
         setNewSensorForm(prev => ({ ...prev, fieldId: dbFields[0].field_id.toString() }));
-        const [dbSensors, dbManual] = await Promise.all([
-          syncSensorsFromDb(dbFields),
-          getManualDiagnosticsForFields(dbFields.map(f => f.field_id))
-        ]);
+        const dbSensors = await syncSensorsFromDb(dbFields);
         setSensors(dbSensors);
-        setManualDiagnostics(dbManual);
       }
       setLoading(false);
     };
@@ -52,12 +47,6 @@ const Sensors: React.FC<{ user: User }> = ({ user }) => {
     setSensors(sensors.map(s => s.sensor_id === updatedSensor.sensor_id ? updatedSensor : s));
     setShowUpdateModal(null);
     setReadingInput({});
-  };
-
-  const handleManualDiagnosticUpdate = async (fieldId: number, data: any) => {
-    const updated = { ...manualDiagnostics, [fieldId]: data };
-    setManualDiagnostics(updated);
-    await saveManualDiagnostic(fieldId, data);
   };
 
   const handleDeleteSensor = async (id: number) => {
@@ -84,12 +73,12 @@ const Sensors: React.FC<{ user: User }> = ({ user }) => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex justify-between items-center mb-12">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">IoT & Manual Data Control</h1>
-          <p className="text-slate-500 text-sm">Everything here is synced to your secure Cloud Firestore.</p>
+          <h1 className="text-2xl font-bold text-slate-900">Cloud Sensor Control</h1>
+          <p className="text-slate-500 text-sm">Update specific sensor values to drive AI field analysis.</p>
         </div>
-        <button onClick={() => setShowAddModal(true)} className="bg-slate-900 text-white px-4 py-2 rounded-lg font-bold hover:bg-slate-800 transition-all shadow-md">
+        <button onClick={() => setShowAddModal(true)} className="bg-emerald-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-lg active:scale-95">
           <i className="fas fa-plus mr-2"></i> Pair New Sensor
         </button>
       </div>
@@ -97,98 +86,56 @@ const Sensors: React.FC<{ user: User }> = ({ user }) => {
       {loading ? (
         <div className="py-20 text-center">
           <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-slate-500">Establishing Secure Link...</p>
+          <p className="text-slate-500">Retrieving Device Network...</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2">
-            <h2 className="text-lg font-bold mb-4 flex items-center gap-2 text-slate-700">
-              <i className="fas fa-microchip text-emerald-600"></i> Cloud Sensor Network
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {sensors.map(sensor => {
-                const field = userFields.find(f => f.field_id === sensor.field_id);
-                return (
-                  <div key={sensor.sensor_id} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all group">
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="bg-slate-50 p-3 rounded-xl group-hover:bg-emerald-50 transition-colors">
-                        <i className={`fas ${sensor.sensor_type === 'Moisture' ? 'fa-droplet text-blue-500' : sensor.sensor_type === 'Temperature' ? 'fa-temperature-high text-orange-500' : sensor.sensor_type === 'NPK Analyzer' ? 'fa-vial text-emerald-500' : 'fa-flask text-purple-500'} text-xl`}></i>
-                      </div>
-                      <button onClick={() => handleDeleteSensor(sensor.sensor_id)} className="text-slate-300 hover:text-red-500 transition-colors"><i className="fas fa-trash"></i></button>
+        <div className="w-full">
+          <h2 className="text-lg font-bold mb-6 flex items-center gap-2 text-slate-700">
+            <i className="fas fa-microchip text-emerald-600"></i> Active Sensor Matrix
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {sensors.map(sensor => {
+              const field = userFields.find(f => f.field_id === sensor.field_id);
+              return (
+                <div key={sensor.sensor_id} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl transition-all group relative overflow-hidden">
+                  <div className="flex justify-between items-start mb-6">
+                    <div className="bg-slate-50 p-4 rounded-2xl group-hover:bg-emerald-50 transition-colors">
+                      <i className={`fas ${sensor.sensor_type.toLowerCase().includes('moisture') ? 'fa-droplet text-blue-500' : sensor.sensor_type.toLowerCase().includes('temperature') ? 'fa-temperature-high text-orange-500' : sensor.sensor_type.toLowerCase().includes('npk') ? 'fa-vial text-emerald-500' : 'fa-flask text-purple-500'} text-xl`}></i>
                     </div>
-                    <h3 className="font-bold text-slate-900">{sensor.sensor_type}</h3>
-                    <p className="text-xs text-slate-400 mb-4">{field?.field_name || 'Unknown Field'}</p>
-                    
-                    <div className="bg-slate-50 p-3 rounded-xl mb-4 border border-slate-100">
-                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Latest Reading</div>
-                      <div className="text-sm font-bold text-slate-700">
-                        {sensor.last_reading ? (
-                          sensor.sensor_type === 'NPK Analyzer' 
-                            ? `N:${sensor.last_reading.n} P:${sensor.last_reading.p} K:${sensor.last_reading.k} ppm`
-                            : `${sensor.last_reading.value}${sensor.sensor_type === 'Moisture' ? '%' : sensor.sensor_type === 'Temperature' ? '°C' : ''}`
-                        ) : 'Pending Data...'}
-                      </div>
-                    </div>
-
-                    <button 
-                      onClick={() => {
-                        setShowUpdateModal(sensor);
-                        setReadingInput(sensor.last_reading || {});
-                      }}
-                      className="w-full py-2 bg-emerald-50 text-emerald-600 rounded-lg text-xs font-bold hover:bg-emerald-600 hover:text-white transition-all"
-                    >
-                      Update Value
-                    </button>
+                    <button onClick={() => handleDeleteSensor(sensor.sensor_id)} className="text-slate-200 hover:text-red-500 transition-colors p-2"><i className="fas fa-trash"></i></button>
                   </div>
-                );
-              })}
-              {sensors.length === 0 && (
-                <div className="col-span-full py-12 text-center bg-white border border-dashed rounded-[2.5rem] text-slate-400 italic">
-                  No cloud-paired sensors yet.
+                  <h3 className="font-bold text-slate-900 text-lg mb-1">{sensor.sensor_type}</h3>
+                  <p className="text-xs text-slate-400 mb-6 font-medium uppercase tracking-tight">{field?.field_name || 'Unassigned Field'}</p>
+                  
+                  <div className="bg-slate-50 p-4 rounded-2xl mb-6 border border-slate-50">
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Current Metric</div>
+                    <div className="text-xl font-black text-slate-800">
+                      {sensor.last_reading ? (
+                        sensor.sensor_type.toLowerCase().includes('npk') 
+                          ? `${sensor.last_reading.n || 0}-${sensor.last_reading.p || 0}-${sensor.last_reading.k || 0}`
+                          : `${sensor.last_reading.value || 0}${sensor.sensor_type.toLowerCase().includes('moisture') ? '%' : sensor.sensor_type.toLowerCase().includes('temperature') ? '°C' : ''}`
+                      ) : 'Awaiting Input'}
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={() => {
+                      setShowUpdateModal(sensor);
+                      setReadingInput(sensor.last_reading || {});
+                    }}
+                    className="w-full py-4 bg-emerald-50 text-emerald-700 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
+                  >
+                    Update Sensor Data
+                  </button>
                 </div>
-              )}
-            </div>
-          </div>
-
-          <div>
-            <h2 className="text-lg font-bold mb-4 flex items-center gap-2 text-slate-700">
-              <i className="fas fa-edit text-blue-600"></i> Field Manual Diagnostics
-            </h2>
-            <div className="space-y-4">
-              {userFields.map(field => {
-                const data = manualDiagnostics[field.field_id] || { moisture: 0, temp: 0, ph: 7, n: 0, p: 0, k: 0 };
-                return (
-                  <div key={field.field_id} className="bg-white p-6 rounded-[2.5rem] border border-blue-50 shadow-sm">
-                    <h3 className="font-bold text-slate-900 mb-4 flex items-center justify-between">
-                      <span>{field.field_name}</span>
-                      <i className="fas fa-cloud text-blue-200 text-xs"></i>
-                    </h3>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Moisture (%)</label>
-                        <input type="number" value={data.moisture} onChange={e => handleManualDiagnosticUpdate(field.field_id, {...data, moisture: Number(e.target.value)})} className="w-full text-sm border-b border-slate-100 focus:border-blue-500 outline-none pb-1 bg-transparent" />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Temp (°C)</label>
-                        <input type="number" value={data.temp} onChange={e => handleManualDiagnosticUpdate(field.field_id, {...data, temp: Number(e.target.value)})} className="w-full text-sm border-b border-slate-100 focus:border-blue-500 outline-none pb-1 bg-transparent" />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">pH</label>
-                        <input type="number" step="0.1" value={data.ph} onChange={e => handleManualDiagnosticUpdate(field.field_id, {...data, ph: Number(e.target.value)})} className="w-full text-sm border-b border-slate-100 focus:border-blue-500 outline-none pb-1 bg-transparent" />
-                      </div>
-                      <div className="col-span-2 mt-2">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">NPK Deficit/Level (ppm)</label>
-                        <div className="flex gap-2">
-                          <input placeholder="N" type="number" value={data.n} onChange={e => handleManualDiagnosticUpdate(field.field_id, {...data, n: Number(e.target.value)})} className="w-full text-sm border-b border-slate-100 outline-none text-center pb-1" />
-                          <input placeholder="P" type="number" value={data.p} onChange={e => handleManualDiagnosticUpdate(field.field_id, {...data, p: Number(e.target.value)})} className="w-full text-sm border-b border-slate-100 outline-none text-center pb-1" />
-                          <input placeholder="K" type="number" value={data.k} onChange={e => handleManualDiagnosticUpdate(field.field_id, {...data, k: Number(e.target.value)})} className="w-full text-sm border-b border-slate-100 outline-none text-center pb-1" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+              );
+            })}
+            {sensors.length === 0 && (
+              <div className="col-span-full py-24 text-center bg-white border border-dashed rounded-[3rem] text-slate-300">
+                <i className="fas fa-satellite-dish text-5xl mb-4 opacity-20"></i>
+                <p className="font-bold">No paired sensors detected in your account.</p>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -196,29 +143,29 @@ const Sensors: React.FC<{ user: User }> = ({ user }) => {
       {/* Add Sensor Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white rounded-[2.5rem] w-full max-w-md p-8 shadow-2xl animate-in zoom-in duration-200">
-            <h2 className="text-2xl font-black mb-6">Pair New Sensor</h2>
+          <div className="bg-white rounded-[2.5rem] w-full max-w-md p-10 shadow-2xl animate-in zoom-in duration-200">
+            <h2 className="text-2xl font-black mb-8">Pair New Device</h2>
             <form onSubmit={handleAddSensor} className="space-y-6">
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">Sensor Category</label>
-                <select className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50" value={newSensorForm.type} onChange={e => setNewSensorForm({...newSensorForm, type: e.target.value})}>
-                  <option value="Moisture">Moisture</option>
-                  <option value="Temperature">Temperature</option>
-                  <option value="NPK Analyzer">NPK Analyzer</option>
-                  <option value="PH Probe">PH Probe</option>
+                <label className="block text-xs font-bold text-slate-400 uppercase mb-2 ml-1">Sensor Type</label>
+                <select className="w-full px-5 py-4 rounded-2xl border-none bg-slate-50 text-sm font-medium focus:ring-2 focus:ring-emerald-500" value={newSensorForm.type} onChange={e => setNewSensorForm({...newSensorForm, type: e.target.value})}>
+                  <option value="Moisture">Moisture Sensor</option>
+                  <option value="Temperature">Temperature Sensor</option>
+                  <option value="NPK Analyzer">NPK Lab-on-Chip</option>
+                  <option value="PH Probe">pH Diagnostic Probe</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">Assign to Managed Field</label>
-                <select className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50" value={newSensorForm.fieldId} onChange={e => setNewSensorForm({...newSensorForm, fieldId: e.target.value})}>
+                <label className="block text-xs font-bold text-slate-400 uppercase mb-2 ml-1">Assigned Plot</label>
+                <select className="w-full px-5 py-4 rounded-2xl border-none bg-slate-50 text-sm font-medium focus:ring-2 focus:ring-emerald-500" value={newSensorForm.fieldId} onChange={e => setNewSensorForm({...newSensorForm, fieldId: e.target.value})}>
                   {userFields.map(f => (
                     <option key={f.field_id} value={f.field_id}>{f.field_name}</option>
                   ))}
                 </select>
               </div>
-              <div className="flex gap-3 pt-4">
-                <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 py-4 rounded-xl font-bold text-slate-500 bg-slate-100 transition-colors">Cancel</button>
-                <button type="submit" className="flex-1 py-4 rounded-xl font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-all shadow-lg">Pair Device</button>
+              <div className="flex gap-4 pt-6">
+                <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 py-4 rounded-2xl font-bold text-slate-500 bg-slate-100 transition-colors">Cancel</button>
+                <button type="submit" className="flex-1 py-4 rounded-2xl font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-all shadow-lg">Activate</button>
               </div>
             </form>
           </div>
@@ -228,35 +175,35 @@ const Sensors: React.FC<{ user: User }> = ({ user }) => {
       {/* Update Reading Modal */}
       {showUpdateModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white rounded-[2.5rem] w-full max-w-md p-8 shadow-2xl">
-            <h2 className="text-xl font-bold mb-6">Update {showUpdateModal.sensor_type} Data</h2>
-            <form onSubmit={handleUpdateReading} className="space-y-6">
-              {showUpdateModal.sensor_type === 'NPK Analyzer' ? (
-                <div className="grid grid-cols-3 gap-4">
+          <div className="bg-white rounded-[3rem] w-full max-w-md p-10 shadow-2xl">
+            <h2 className="text-xl font-bold mb-8">Update {showUpdateModal.sensor_type} Metrics</h2>
+            <form onSubmit={handleUpdateReading} className="space-y-8">
+              {showUpdateModal.sensor_type.toLowerCase().includes('npk') ? (
+                <div className="grid grid-cols-3 gap-6">
                   <div>
-                    <label className="block text-xs font-bold mb-1">N (ppm)</label>
-                    <input type="number" className="w-full p-3 border rounded-xl" value={readingInput.n || 0} onChange={e => setReadingInput({...readingInput, n: Number(e.target.value)})} />
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Nitrogen</label>
+                    <input type="number" className="w-full p-4 bg-slate-50 border-none rounded-2xl text-center font-bold" value={readingInput.n || 0} onChange={e => setReadingInput({...readingInput, n: Number(e.target.value)})} />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold mb-1">P (ppm)</label>
-                    <input type="number" className="w-full p-3 border rounded-xl" value={readingInput.p || 0} onChange={e => setReadingInput({...readingInput, p: Number(e.target.value)})} />
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Phosphorus</label>
+                    <input type="number" className="w-full p-4 bg-slate-50 border-none rounded-2xl text-center font-bold" value={readingInput.p || 0} onChange={e => setReadingInput({...readingInput, p: Number(e.target.value)})} />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold mb-1">K (ppm)</label>
-                    <input type="number" className="w-full p-3 border rounded-xl" value={readingInput.k || 0} onChange={e => setReadingInput({...readingInput, k: Number(e.target.value)})} />
+                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-2">Potassium</label>
+                    <input type="number" className="w-full p-4 bg-slate-50 border-none rounded-2xl text-center font-bold" value={readingInput.k || 0} onChange={e => setReadingInput({...readingInput, k: Number(e.target.value)})} />
                   </div>
                 </div>
               ) : (
                 <div>
-                  <label className="block text-sm font-bold mb-2">
-                    Current Reading {showUpdateModal.sensor_type === 'Moisture' ? '(%)' : showUpdateModal.sensor_type === 'Temperature' ? '(°C)' : '(pH)'}
+                  <label className="block text-sm font-bold text-slate-700 mb-3">
+                    Input Reading {showUpdateModal.sensor_type.toLowerCase().includes('moisture') ? '(%)' : showUpdateModal.sensor_type.toLowerCase().includes('temperature') ? '(°C)' : '(pH Scale)'}
                   </label>
-                  <input type="number" step="0.1" className="w-full p-4 border rounded-xl" value={readingInput.value || 0} onChange={e => setReadingInput({...readingInput, value: Number(e.target.value)})} />
+                  <input type="number" step="0.1" className="w-full p-5 bg-slate-50 border-none rounded-2xl text-xl font-black text-center" value={readingInput.value || 0} onChange={e => setReadingInput({...readingInput, value: Number(e.target.value)})} />
                 </div>
               )}
-              <div className="flex gap-3">
-                <button type="button" onClick={() => setShowUpdateModal(null)} className="flex-1 py-4 rounded-xl font-bold bg-slate-100">Cancel</button>
-                <button type="submit" className="flex-1 py-4 rounded-xl font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-all shadow-md">Sync Data</button>
+              <div className="flex gap-4">
+                <button type="button" onClick={() => setShowUpdateModal(null)} className="flex-1 py-4 rounded-2xl font-bold bg-slate-100 text-slate-500">Cancel</button>
+                <button type="submit" className="flex-1 py-4 rounded-2xl font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-all shadow-xl">Sync to Field</button>
               </div>
             </form>
           </div>
