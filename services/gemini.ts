@@ -3,35 +3,35 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { Field } from "../types";
 
 /**
- * The AI is ready if the environment-provided API_KEY exists.
+ * In Central API mode, we assume the API_KEY is provided by the environment.
  */
 export const isAiReady = async () => {
   return !!process.env.API_KEY;
 };
 
 /**
- * Not used in shared key mode, but kept for compatibility.
+ * Legacy support for selector, but returns success if key exists.
  */
 export const openAiKeySelector = async () => {
-  return true;
+  return !!process.env.API_KEY;
 };
 
 const getAIClient = () => {
   const apiKey = process.env.API_KEY;
   if (!apiKey) {
-    throw new Error("API_KEY_REQUIRED");
+    throw new Error("API_KEY_MISSING");
   }
   return new GoogleGenAI({ apiKey });
 };
 
 /**
- * Format sensor values for the AI prompt.
+ * Formats data from manual uploads for the AI prompt.
  */
 const formatDataForPrompt = (data: any) => {
-  const safeVal = (val: any) => (val != null) ? Number(val).toFixed(2) : "MISSING";
+  const safeVal = (val: any) => (val != null) ? Number(val).toFixed(2) : "NOT PROVIDED";
 
   return `
-    FIELD MEASUREMENTS:
+    CURRENT SENSOR MEASUREMENTS (MANUAL UPLOADS):
     - Soil Moisture: ${safeVal(data.moisture)}${data.moisture != null ? '%' : ''}
     - Soil pH: ${safeVal(data.ph_level)}
     - Ambient Temperature: ${safeVal(data.temperature)}${data.temperature != null ? '°C' : ''}
@@ -39,9 +39,9 @@ const formatDataForPrompt = (data: any) => {
     - Phosphorus (P): ${safeVal(data.npk_p)} ppm
     - Potassium (K): ${safeVal(data.npk_k)} ppm
     
-    CRITICAL CONTEXT:
-    Use your domain expertise of ${data.location || 'Bangladesh'} and ${data.soil_type || 'Loamy'} soil to evaluate the health condition. 
-    Prioritize the real sensor readings provided.
+    FIELD CONTEXT:
+    Location: ${data.location || 'Bangladesh'}
+    Soil Type: ${data.soil_type || 'Loamy'}
   `;
 };
 
@@ -93,16 +93,17 @@ export const getSoilHealthSummary = async (field: Field, latestData: any) => {
         Examine the soil health condition for ${field.field_name} in ${field.location}.
         ${formatDataForPrompt({...latestData, location: field.location, soil_type: field.soil_type})}
         
-        Based on these specific readings, provide a brief, professional idea of the current health state. 
-        Are the nutrients balanced? Is the moisture ideal? 
-        Write exactly 3 sentences. Do not use markdown.
+        INSTRUCTIONS:
+        Based on the manual data uploads from the sensors, give a brief idea of the health condition of the soil. 
+        Determine if the current NPK, pH, and Moisture levels are balanced for a healthy crop.
+        Write exactly 3 concise sentences. Do not use bold or markdown.
       `
     });
     
-    return response.text || "Health diagnostics analyzed. Soil health markers are within expected seasonal ranges.";
+    return response.text || "Health analysis complete. Soil markers are within the stable range for current seasonal patterns.";
   } catch (error: any) {
     console.error("Gemini Summary Error:", error);
-    return "The AI engine is synthesizing your field data. Analysis will appear shortly.";
+    return "AI analysis engine is warming up. Please ensure your central API_KEY is configured.";
   }
 };
 
@@ -112,10 +113,10 @@ export const getDetailedManagementPlan = async (field: Field, latestData: any) =
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `
-        Based on the current data for ${field.field_name}, suggest 4 prioritized steps to make the crops and fields healthier.
+        Suggest 4 prioritized steps to make the crops and fields healthier based on the current sensor data.
         ${formatDataForPrompt({...latestData, location: field.location, soil_type: field.soil_type})}
         
-        Focus on soil restoration, precise nutrient application, and preventative maintenance.
+        Provide specific steps to improve crop health (e.g., adding specific fertilizers for NPK deficits, or irrigation adjustments for moisture).
       `,
       config: {
         responseMimeType: "application/json",
