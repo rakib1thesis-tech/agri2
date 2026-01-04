@@ -3,35 +3,31 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { Field } from "../types";
 
 /**
- * Checks if the central API key is available in the environment.
+ * Validates if the central API key is available in the environment.
  */
 export const isAiReady = async () => {
   return !!process.env.API_KEY;
 };
 
 /**
- * Legacy support for key selection (not required in Central mode).
+ * Internal helper to instantiate the GenAI client using the shared environment key.
  */
-export const openAiKeySelector = async () => {
-  return !!process.env.API_KEY;
-};
-
 const getAIClient = () => {
   const apiKey = process.env.API_KEY;
   if (!apiKey) {
-    throw new Error("CENTRAL_API_KEY_MISSING");
+    throw new Error("CENTRAL_API_KEY_NOT_FOUND");
   }
   return new GoogleGenAI({ apiKey });
 };
 
 /**
- * Formats manual sensor data for the Gemini prompt.
+ * Formats data from manual sensor uploads for the AI prompt.
  */
 const formatDataForPrompt = (data: any) => {
-  const safeVal = (val: any) => (val != null) ? Number(val).toFixed(2) : "UNAVAILABLE";
+  const safeVal = (val: any) => (val != null) ? Number(val).toFixed(2) : "N/A";
 
   return `
-    FIELD TELEMETRY (MANUAL UPLOADS):
+    FIELD DATA (MANUAL SENSOR UPLOADS):
     - Soil Moisture: ${safeVal(data.moisture)}${data.moisture != null ? '%' : ''}
     - Soil pH: ${safeVal(data.ph_level)}
     - Ambient Temperature: ${safeVal(data.temperature)}${data.temperature != null ? '°C' : ''}
@@ -39,8 +35,7 @@ const formatDataForPrompt = (data: any) => {
     - Phosphorus (P): ${safeVal(data.npk_p)} ppm
     - Potassium (K): ${safeVal(data.npk_k)} ppm
     
-    ENVIRONMENTAL CONTEXT:
-    Plot: ${data.field_name || 'Primary Field'}
+    FIELD SPECIFICATIONS:
     Location: ${data.location || 'Bangladesh'}
     Soil Profile: ${data.soil_type || 'Loamy'}
   `;
@@ -52,8 +47,11 @@ export const getCropAnalysis = async (field: Field, latestData: any) => {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `
-        Recommend 3 crops for this field based on current nutrient levels.
-        ${formatDataForPrompt({...latestData, ...field})}
+        Analyze this agricultural field and recommend the top 3 best-fitting crops.
+        Field: ${field.field_name}, Location: ${field.location}, Soil Type: ${field.soil_type}.
+        ${formatDataForPrompt({...latestData, location: field.location, soil_type: field.soil_type})}
+        
+        Provide high-yield recommendations specifically for the ${field.location} region.
       `,
       config: {
         responseMimeType: "application/json",
@@ -63,10 +61,10 @@ export const getCropAnalysis = async (field: Field, latestData: any) => {
             type: Type.OBJECT,
             properties: {
               name: { type: Type.STRING },
-              suitability: { type: Type.NUMBER },
-              yield: { type: Type.STRING },
-              requirements: { type: Type.STRING },
-              icon: { type: Type.STRING }
+              suitability: { type: Type.NUMBER, description: "Match percentage 0-100" },
+              yield: { type: Type.STRING, description: "Expected tonnage per hectare" },
+              requirements: { type: Type.STRING, description: "Specific care instructions based on current soil" },
+              icon: { type: Type.STRING, description: "FontAwesome icon name (e.g., fa-wheat-awn)" }
             },
             required: ["name", "suitability", "yield", "requirements", "icon"]
           }
@@ -76,8 +74,8 @@ export const getCropAnalysis = async (field: Field, latestData: any) => {
     
     const text = response.text;
     return text ? JSON.parse(text) : [];
-  } catch (error) {
-    console.error("Analysis Error:", error);
+  } catch (error: any) {
+    console.error("Gemini Analysis Error:", error);
     return [];
   }
 };
@@ -88,22 +86,22 @@ export const getSoilHealthSummary = async (field: Field, latestData: any) => {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `
-        Analyze the soil health condition for ${field.field_name}.
-        ${formatDataForPrompt({...latestData, ...field})}
+        Examine the soil health condition for ${field.field_name} in ${field.location}.
+        ${formatDataForPrompt({...latestData, location: field.location, soil_type: field.soil_type})}
         
         TASK:
-        Give a brief, clear idea of the health condition of the soil based on the provided readings. 
-        Identify if any specific parameter (pH, Moisture, N, P, or K) is currently the limiting factor for growth.
-        Write exactly 3 sentences. No markdown.
+        Based on the data provided, evaluate the current health condition of the soil. 
+        Determine if the current NPK, pH, and Moisture levels are balanced.
+        Write exactly 3 professional sentences. Do not use markdown.
       `
     });
     
-    return response.text || "Health metrics analyzed. Parameters are currently in a stable state.";
+    return response.text || "Health analysis complete. Soil markers are within standard bounds.";
   } catch (error: any) {
-    if (error.message === "CENTRAL_API_KEY_MISSING") {
-      return "Central API key not found. Please set the API_KEY environment variable in your hosting provider (e.g., Cloudflare Settings) to activate AI diagnostics.";
+    if (error.message === "CENTRAL_API_KEY_NOT_FOUND") {
+      return "Central AI Integration Error: The API_KEY environment variable is not being detected. Please ensure your cloud provider is injecting the key into the build environment.";
     }
-    return "The AI engine is currently processing your field data. Please refresh in a moment.";
+    return "AI diagnostics in progress. Please refresh after ensuring your sensor data is updated.";
   }
 };
 
@@ -113,10 +111,8 @@ export const getDetailedManagementPlan = async (field: Field, latestData: any) =
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `
-        Suggest 4 prioritized steps to make the crops and fields healthier.
-        ${formatDataForPrompt({...latestData, ...field})}
-        
-        Focus on correcting imbalances in the NPK profile and moisture levels.
+        Suggest 4 prioritized steps to make the crops and fields healthier based on these readings.
+        ${formatDataForPrompt({...latestData, location: field.location, soil_type: field.soil_type})}
       `,
       config: {
         responseMimeType: "application/json",
@@ -125,7 +121,7 @@ export const getDetailedManagementPlan = async (field: Field, latestData: any) =
           items: {
             type: Type.OBJECT,
             properties: {
-              priority: { type: Type.STRING },
+              priority: { type: Type.STRING, description: "High, Medium, or Low" },
               title: { type: Type.STRING },
               description: { type: Type.STRING },
               icon: { type: Type.STRING }
@@ -138,7 +134,8 @@ export const getDetailedManagementPlan = async (field: Field, latestData: any) =
     
     const text = response.text;
     return text ? JSON.parse(text) : [];
-  } catch (error) {
+  } catch (error: any) {
+    console.error("Gemini Plan Error:", error);
     return [];
   }
 };

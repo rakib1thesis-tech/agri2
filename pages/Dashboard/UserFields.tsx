@@ -36,7 +36,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
   });
 
   useEffect(() => {
-    const checkAi = async () => {
+    const checkAiStatus = async () => {
       const ready = await isAiReady();
       setAiConnected(ready);
     };
@@ -44,7 +44,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       const dbFields = await syncFields(user.id);
       setFields(dbFields);
     };
-    checkAi();
+    checkAiStatus();
     loadFields();
   }, [user.id]);
 
@@ -91,6 +91,8 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       const latest = await getFieldCurrentStats(field);
       setCurrentDataState(latest);
 
+      // In Central API mode, we attempt results immediately.
+      // Error handling within services/gemini.ts will inform the user if the key is missing.
       const [analysis, summary, plan] = await Promise.all([
         getCropAnalysis(field, latest),
         getSoilHealthSummary(field, latest),
@@ -100,9 +102,13 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       setRecommendations(analysis);
       setAiSummary(summary);
       setManagementPlan(plan);
+      
+      // Re-verify AI status from environment
+      const ready = await isAiReady();
+      setAiConnected(ready);
     } catch (err: any) {
       console.error("AI Analysis failed", err);
-      setAiSummary("AI Node busy. Ensure your central API_KEY is configured in the hosting provider.");
+      setAiSummary("Central API Sync failed. Please verify your environment variables.");
     } finally {
       setLoading(false);
     }
@@ -130,7 +136,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Field Command Center</h1>
-          <p className="text-slate-500 text-sm">Automated health diagnostics based on your manual sensor uploads.</p>
+          <p className="text-slate-500 text-sm">Automated AI health diagnostics powered by central API telemetry.</p>
         </div>
         <button onClick={() => setShowAddFieldModal(true)} className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-emerald-700 shadow-md transition-all active:scale-95">
           <i className="fas fa-plus"></i> Add New Field
@@ -164,7 +170,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                 <i className="fas fa-satellite text-3xl"></i>
               </div>
               <h2 className="text-2xl font-bold text-slate-800">Select a Plot</h2>
-              <p className="text-slate-500 mt-2 max-w-sm mx-auto">Choose a field on the left to see health conditions and improvement steps.</p>
+              <p className="text-slate-500 mt-2 max-w-sm mx-auto">Select a field on the left. The system will automatically analyze your manual sensor uploads using the shared AI engine.</p>
             </div>
           ) : (
             <div className="space-y-8 animate-in fade-in slide-in-from-right-4">
@@ -177,7 +183,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                         <i className="fas fa-robot text-sm"></i>
                       </div>
                       <span className={`text-xs font-bold uppercase tracking-widest ${aiConnected ? 'text-emerald-400' : 'text-slate-400'}`}>
-                        {aiConnected ? 'AI Health Engine Active' : 'AI Offline'}
+                        {aiConnected ? 'AI Central Node Active' : 'AI Offline / Not Found'}
                       </span>
                     </div>
                     <h2 className="text-4xl font-black">{selectedField.field_name}</h2>
@@ -204,8 +210,8 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
               {loading ? (
                 <div className="bg-white p-24 text-center rounded-[3rem] border border-slate-100 shadow-sm">
                   <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-8"></div>
-                  <h3 className="text-2xl font-bold text-slate-800">Processing Field Health...</h3>
-                  <p className="text-slate-500 mt-2">Connecting to the central Gemini-3 engine.</p>
+                  <h3 className="text-2xl font-bold text-slate-800">Synthesizing Condition Report...</h3>
+                  <p className="text-slate-500 mt-2">Connecting to your shared AI API key.</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-12">
@@ -214,15 +220,15 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                       <div className="absolute top-0 right-0 p-8 text-emerald-100 text-6xl opacity-20 pointer-events-none">
                         <i className="fas fa-heart-pulse"></i>
                       </div>
-                      <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-3"><i className="fas fa-stethoscope text-emerald-600"></i> AI Soil Health Insight</h3>
+                      <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-3"><i className="fas fa-stethoscope text-emerald-600"></i> AI Soil Health Condition</h3>
                       <p className="text-slate-600 leading-relaxed whitespace-pre-line text-lg font-medium">
-                        {aiSummary || "Update your sensor data in the Sensors tab to generate a condition report."}
+                        {aiSummary || "Update your sensor data in the Sensors tab to generate a health report."}
                       </p>
                     </div>
 
                     <div>
                       <h3 className="text-xl font-bold text-slate-900 mb-6 px-2 flex items-center gap-3">
-                        <i className="fas fa-seedling text-emerald-600"></i> Crop Recommendations
+                        <i className="fas fa-seedling text-emerald-600"></i> Optimized Crop Recommendations
                       </h3>
                       {recommendations && recommendations.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -240,7 +246,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                       ) : (
                         <div className="bg-slate-50 p-12 rounded-[2.5rem] border border-dashed border-slate-200 text-center text-slate-400">
                           <i className="fas fa-chart-area text-3xl mb-4 block opacity-30"></i>
-                          <p className="text-sm font-medium">Update sensor values to see AI modeling.</p>
+                          <p className="text-sm font-medium">Analysis results will appear once the shared API key and sensor data are active.</p>
                         </div>
                       )}
                     </div>
@@ -264,7 +270,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                         ) : (
                           <div className="text-center py-12 text-slate-300">
                             <i className="fas fa-clipboard-list text-4xl mb-4 block opacity-20"></i>
-                            <p className="text-sm">Improvement steps will appear here after data sync.</p>
+                            <p className="text-sm">Improvement steps to make crops healthier will appear here after automated analysis.</p>
                           </div>
                         )}
                       </div>
