@@ -6,15 +6,15 @@ import { Field } from "../types";
  * Validates if the central API key is available in the environment.
  */
 export const isAiReady = async () => {
-  return !!process.env.API_KEY;
+  return !!process.env.API_KEY && process.env.API_KEY !== "undefined";
 };
 
 /**
- * Internal helper to instantiate the GenAI client using the shared environment key.
+ * Internal helper to instantiate the GenAI client.
  */
 const getAIClient = () => {
   const apiKey = process.env.API_KEY;
-  if (!apiKey) {
+  if (!apiKey || apiKey === "undefined") {
     throw new Error("CENTRAL_API_KEY_NOT_FOUND");
   }
   return new GoogleGenAI({ apiKey });
@@ -50,8 +50,6 @@ export const getCropAnalysis = async (field: Field, latestData: any) => {
         Analyze this agricultural field and recommend the top 3 best-fitting crops.
         Field: ${field.field_name}, Location: ${field.location}, Soil Type: ${field.soil_type}.
         ${formatDataForPrompt({...latestData, location: field.location, soil_type: field.soil_type})}
-        
-        Provide high-yield recommendations specifically for the ${field.location} region.
       `,
       config: {
         responseMimeType: "application/json",
@@ -61,10 +59,10 @@ export const getCropAnalysis = async (field: Field, latestData: any) => {
             type: Type.OBJECT,
             properties: {
               name: { type: Type.STRING },
-              suitability: { type: Type.NUMBER, description: "Match percentage 0-100" },
-              yield: { type: Type.STRING, description: "Expected tonnage per hectare" },
-              requirements: { type: Type.STRING, description: "Specific care instructions based on current soil" },
-              icon: { type: Type.STRING, description: "FontAwesome icon name (e.g., fa-wheat-awn)" }
+              suitability: { type: Type.NUMBER },
+              yield: { type: Type.STRING },
+              requirements: { type: Type.STRING },
+              icon: { type: Type.STRING }
             },
             required: ["name", "suitability", "yield", "requirements", "icon"]
           }
@@ -75,7 +73,6 @@ export const getCropAnalysis = async (field: Field, latestData: any) => {
     const text = response.text;
     return text ? JSON.parse(text) : [];
   } catch (error: any) {
-    console.error("Gemini Analysis Error:", error);
     return [];
   }
 };
@@ -89,19 +86,16 @@ export const getSoilHealthSummary = async (field: Field, latestData: any) => {
         Examine the soil health condition for ${field.field_name} in ${field.location}.
         ${formatDataForPrompt({...latestData, location: field.location, soil_type: field.soil_type})}
         
-        TASK:
-        Based on the data provided, evaluate the current health condition of the soil. 
-        Determine if the current NPK, pH, and Moisture levels are balanced.
-        Write exactly 3 professional sentences. Do not use markdown.
+        Write exactly 3 sentences evaluating the current health condition.
       `
     });
     
-    return response.text || "Health analysis complete. Soil markers are within standard bounds.";
+    return response.text || "Health analysis complete.";
   } catch (error: any) {
     if (error.message === "CENTRAL_API_KEY_NOT_FOUND") {
-      return "Central AI Integration Error: The API_KEY environment variable is not being detected. Please ensure your cloud provider is injecting the key into the build environment.";
+      return `[SETUP REQUIRED] Step 1: Add "API_KEY" to Cloudflare Environment Variables. \nStep 2: Change Build Command to "API_KEY=$API_KEY npm run build". \nStep 3: Redeploy the project.`;
     }
-    return "AI diagnostics in progress. Please refresh after ensuring your sensor data is updated.";
+    return "The AI engine is waiting for sensor data sync. Please ensure you have updated values in the Sensors tab.";
   }
 };
 
@@ -111,7 +105,7 @@ export const getDetailedManagementPlan = async (field: Field, latestData: any) =
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `
-        Suggest 4 prioritized steps to make the crops and fields healthier based on these readings.
+        Suggest 4 prioritized steps for health improvement for ${field.field_name}.
         ${formatDataForPrompt({...latestData, location: field.location, soil_type: field.soil_type})}
       `,
       config: {
@@ -121,7 +115,7 @@ export const getDetailedManagementPlan = async (field: Field, latestData: any) =
           items: {
             type: Type.OBJECT,
             properties: {
-              priority: { type: Type.STRING, description: "High, Medium, or Low" },
+              priority: { type: Type.STRING },
               title: { type: Type.STRING },
               description: { type: Type.STRING },
               icon: { type: Type.STRING }
@@ -135,7 +129,6 @@ export const getDetailedManagementPlan = async (field: Field, latestData: any) =
     const text = response.text;
     return text ? JSON.parse(text) : [];
   } catch (error: any) {
-    console.error("Gemini Plan Error:", error);
     return [];
   }
 };

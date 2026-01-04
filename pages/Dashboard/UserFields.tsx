@@ -91,8 +91,6 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       const latest = await getFieldCurrentStats(field);
       setCurrentDataState(latest);
 
-      // In Central API mode, we attempt results immediately.
-      // Error handling within services/gemini.ts will inform the user if the key is missing.
       const [analysis, summary, plan] = await Promise.all([
         getCropAnalysis(field, latest),
         getSoilHealthSummary(field, latest),
@@ -103,12 +101,11 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       setAiSummary(summary);
       setManagementPlan(plan);
       
-      // Re-verify AI status from environment
       const ready = await isAiReady();
       setAiConnected(ready);
     } catch (err: any) {
       console.error("AI Analysis failed", err);
-      setAiSummary("Central API Sync failed. Please verify your environment variables.");
+      setAiSummary("Internal telemetry error. Ensure API_KEY is correctly mapped in the cloud build environment.");
     } finally {
       setLoading(false);
     }
@@ -170,7 +167,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                 <i className="fas fa-satellite text-3xl"></i>
               </div>
               <h2 className="text-2xl font-bold text-slate-800">Select a Plot</h2>
-              <p className="text-slate-500 mt-2 max-w-sm mx-auto">Select a field on the left. The system will automatically analyze your manual sensor uploads using the shared AI engine.</p>
+              <p className="text-slate-500 mt-2 max-w-sm mx-auto">Select a field to run diagnostics.</p>
             </div>
           ) : (
             <div className="space-y-8 animate-in fade-in slide-in-from-right-4">
@@ -179,11 +176,11 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                 <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                   <div>
                     <div className="flex items-center gap-3 mb-2">
-                      <div className={`w-8 h-8 ${aiConnected ? 'bg-emerald-500' : 'bg-slate-700'} rounded-lg flex items-center justify-center transition-colors shadow-lg shadow-emerald-500/20`}>
+                      <div className={`w-8 h-8 ${aiConnected ? 'bg-emerald-500' : 'bg-red-500'} rounded-lg flex items-center justify-center transition-colors shadow-lg`}>
                         <i className="fas fa-robot text-sm"></i>
                       </div>
-                      <span className={`text-xs font-bold uppercase tracking-widest ${aiConnected ? 'text-emerald-400' : 'text-slate-400'}`}>
-                        {aiConnected ? 'AI Central Node Active' : 'AI Offline / Not Found'}
+                      <span className={`text-xs font-bold uppercase tracking-widest ${aiConnected ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {aiConnected ? 'AI Central Node Active' : 'AI Offline (Setup Missing)'}
                       </span>
                     </div>
                     <h2 className="text-4xl font-black">{selectedField.field_name}</h2>
@@ -199,10 +196,6 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                       <i className={`fas ${(currentDataState?.ph_level != null) ? 'fa-check-circle' : 'fa-circle-xmark'}`}></i>
                       <span>pH {(currentDataState?.ph_level != null) ? `(${currentDataState.ph_level})` : 'Missing'}</span>
                     </div>
-                    <div className={`flex items-center gap-2 ${(currentDataState?.npk_n != null) ? 'text-emerald-400' : 'text-slate-500 opacity-50'}`}>
-                      <i className={`fas ${(currentDataState?.npk_n != null) ? 'fa-check-circle' : 'fa-circle-xmark'}`}></i>
-                      <span>NPK Analysis {(currentDataState?.npk_n != null) ? 'Synced' : 'Waiting'}</span>
-                    </div>
                   </div>
                 </div>
               </div>
@@ -210,20 +203,18 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
               {loading ? (
                 <div className="bg-white p-24 text-center rounded-[3rem] border border-slate-100 shadow-sm">
                   <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-8"></div>
-                  <h3 className="text-2xl font-bold text-slate-800">Synthesizing Condition Report...</h3>
-                  <p className="text-slate-500 mt-2">Connecting to your shared AI API key.</p>
+                  <h3 className="text-2xl font-bold text-slate-800">Connecting to Cloud AI...</h3>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-12">
                   <div className="lg:col-span-2 space-y-8">
-                    <div className="bg-white p-10 rounded-[2.5rem] border border-emerald-100 shadow-sm relative group overflow-hidden min-h-[200px]">
-                      <div className="absolute top-0 right-0 p-8 text-emerald-100 text-6xl opacity-20 pointer-events-none">
-                        <i className="fas fa-heart-pulse"></i>
-                      </div>
+                    <div className="bg-white p-10 rounded-[2.5rem] border border-emerald-100 shadow-sm relative overflow-hidden min-h-[200px]">
                       <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-3"><i className="fas fa-stethoscope text-emerald-600"></i> AI Soil Health Condition</h3>
-                      <p className="text-slate-600 leading-relaxed whitespace-pre-line text-lg font-medium">
-                        {aiSummary || "Update your sensor data in the Sensors tab to generate a health report."}
-                      </p>
+                      <div className={`p-6 rounded-2xl ${aiSummary?.includes('[SETUP REQUIRED]') ? 'bg-red-50 text-red-700 border border-red-100' : 'text-slate-600'}`}>
+                        <p className="leading-relaxed whitespace-pre-line text-lg font-medium">
+                          {aiSummary}
+                        </p>
+                      </div>
                     </div>
 
                     <div>
@@ -234,19 +225,14 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           {recommendations.map((crop, i) => (
                             <div key={i} className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl transition-all">
-                              <div className="flex justify-between items-start mb-6">
-                                <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center"><i className={`fas ${crop.icon || 'fa-wheat-awn'} text-2xl`}></i></div>
-                                <span className="bg-emerald-50 text-emerald-700 text-xs font-bold px-3 py-1 rounded-full">{crop.suitability}% Match</span>
-                              </div>
                               <h4 className="text-xl font-bold text-slate-900 mb-1">{crop.name}</h4>
-                              <p className="text-sm text-slate-600 border-t pt-4 leading-relaxed">{crop.requirements}</p>
+                              <p className="text-sm text-slate-600 border-t pt-4">{crop.requirements}</p>
                             </div>
                           ))}
                         </div>
                       ) : (
-                        <div className="bg-slate-50 p-12 rounded-[2.5rem] border border-dashed border-slate-200 text-center text-slate-400">
-                          <i className="fas fa-chart-area text-3xl mb-4 block opacity-30"></i>
-                          <p className="text-sm font-medium">Analysis results will appear once the shared API key and sensor data are active.</p>
+                        <div className="bg-slate-50 p-12 rounded-[2.5rem] border border-dashed text-center text-slate-400 font-bold">
+                          Awaiting Cloud AI Activation
                         </div>
                       )}
                     </div>
@@ -254,23 +240,19 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
 
                   <div className="lg:col-span-1">
                     <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm h-full">
-                      <h3 className="text-xl font-bold text-slate-900 mb-8 flex items-center gap-3"><i className="fas fa-road text-emerald-600"></i> Health Improvement Roadmap</h3>
+                      <h3 className="text-xl font-bold text-slate-900 mb-8 flex items-center gap-3"><i className="fas fa-road text-emerald-600"></i> Health Roadmap</h3>
                       <div className="space-y-8">
                         {managementPlan && managementPlan.length > 0 ? (
                           managementPlan.map((task, i) => (
                             <div key={i} className="relative pl-8 group">
-                              <div className="absolute left-0 top-0 bottom-0 w-1 bg-slate-100 rounded-full group-hover:bg-emerald-200 transition-colors"></div>
-                              <div className={`text-[10px] font-bold uppercase tracking-widest mb-2 ${task.priority === 'High' ? 'text-red-600' : task.priority === 'Medium' ? 'text-emerald-600' : 'text-slate-500'}`}>
-                                {task.priority} Priority
-                              </div>
+                              <div className="absolute left-0 top-0 bottom-0 w-1 bg-slate-100 rounded-full group-hover:bg-emerald-200"></div>
                               <h4 className="font-bold text-slate-900 text-base mb-2">{task.title}</h4>
                               <p className="text-sm text-slate-500 leading-relaxed">{task.description}</p>
                             </div>
                           ))
                         ) : (
-                          <div className="text-center py-12 text-slate-300">
-                            <i className="fas fa-clipboard-list text-4xl mb-4 block opacity-20"></i>
-                            <p className="text-sm">Improvement steps to make crops healthier will appear here after automated analysis.</p>
+                          <div className="text-center py-12 text-slate-300 font-bold">
+                            Setup Required
                           </div>
                         )}
                       </div>
@@ -282,44 +264,6 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
           )}
         </div>
       </div>
-
-      {/* Add Field Modal */}
-      {showAddFieldModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white rounded-[2.5rem] w-full max-w-md p-10 shadow-2xl animate-in zoom-in duration-200">
-            <h2 className="text-2xl font-black mb-8 text-slate-900">Register New Field</h2>
-            <form onSubmit={handleAddField} className="space-y-6">
-              <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase mb-2 ml-1">Field Name</label>
-                <input required type="text" value={newFieldData.name} onChange={e => setNewFieldData({...newFieldData, name: e.target.value})} className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl text-sm outline-none focus:ring-2 focus:ring-emerald-500" placeholder="e.g. South Paddy Field" />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase mb-2 ml-1">District / Location</label>
-                <input required type="text" value={newFieldData.location} onChange={e => setNewFieldData({...newFieldData, location: e.target.value})} className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl text-sm outline-none focus:ring-2 focus:ring-emerald-500" placeholder="e.g. Bogura, Bangladesh" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase mb-2 ml-1">Size (ha)</label>
-                  <input required type="number" step="0.1" value={newFieldData.size} onChange={e => setNewFieldData({...newFieldData, size: e.target.value})} className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl text-sm outline-none focus:ring-2 focus:ring-emerald-500" placeholder="5.2" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase mb-2 ml-1">Soil Type</label>
-                  <select value={newFieldData.soilType} onChange={e => setNewFieldData({...newFieldData, soilType: e.target.value})} className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl text-sm outline-none focus:ring-2 focus:ring-emerald-500">
-                    <option value="Loamy">Loamy</option>
-                    <option value="Clay">Clay</option>
-                    <option value="Sandy">Sandy</option>
-                    <option value="Alluvial">Alluvial</option>
-                  </select>
-                </div>
-              </div>
-              <div className="flex gap-4 pt-6">
-                <button type="button" onClick={() => setShowAddFieldModal(false)} className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold transition-colors">Cancel</button>
-                <button type="submit" className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-bold shadow-xl shadow-emerald-200 transition-all hover:bg-emerald-700">Deploy Field</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
