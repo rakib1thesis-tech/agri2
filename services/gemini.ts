@@ -71,19 +71,29 @@ const cleanAndParseJSON = (text: string | undefined) => {
 };
 
 /**
- * Comprehensive Telemetry Context
+ * Enhanced Telemetry Context with "Missing" Awareness
  */
 const formatDataForPrompt = (data: any) => {
-  const safeVal = (val: any) => (val != null && !isNaN(Number(val))) ? Number(val).toFixed(2) : "N/A";
-  
+  const format = (key: string, label: string, unit: string = '') => {
+    const val = data[key];
+    if (val === undefined || val === null) return `${label}: [MISSING - SENSOR NOT REGISTERED]`;
+    return `${label}: ${Number(val).toFixed(2)}${unit}`;
+  };
+
+  const npkStatus = (data.npk_n !== undefined) 
+    ? `Nitrogen=${data.npk_n}, Phosphorus=${data.npk_p}, Potassium=${data.npk_k}` 
+    : "[MISSING - NPK ANALYZER NOT REGISTERED]";
+
   return `
-    [SENSOR DATA PILLARS]
-    1. MOISTURE: ${safeVal(data.moisture)}% (Thresholds: <20% Dry, >75% Saturated)
-    2. pH LEVEL: ${safeVal(data.ph_level)} (Acidity: <5.5 is harmful for NPK absorption)
-    3. NPK PROFILE (ppm): Nitrogen=${safeVal(data.npk_n)}, Phosphorus=${safeVal(data.npk_p)}, Potassium=${safeVal(data.npk_k)}
-    4. TEMPERATURE: ${safeVal(data.temperature)}°C
+    [INSTALLED SENSOR PILLARS]
+    1. MOISTURE: ${format('moisture', 'Current Reading', '%')}
+    2. pH LEVEL: ${format('ph_level', 'Current Reading')}
+    3. NPK PROFILE: ${npkStatus}
+    4. TEMPERATURE: ${format('temperature', 'Current Reading', '°C')}
     
     FIELD CONTEXT: ${data.field_name} at ${data.location}, Soil Type: ${data.soil_type || 'Loamy'}.
+    
+    IMPORTANT: You MUST NOT invent data for categories marked as [MISSING]. If a category is missing, do not include it in the restoration strategy; instead, briefly note that a sensor is required for that metric.
   `;
 };
 
@@ -111,7 +121,7 @@ export const getCropAnalysis = async (field: Field, latestData: any): Promise<Cr
   try {
     const response = await aiProvider.generate({
       model: MODEL_NAME,
-      contents: `Suggest 3 crops considering NPK levels and Temperature constraints: ${formatDataForPrompt({...latestData, ...field})}`,
+      contents: `Suggest 3 crops based ONLY on available telemetry. ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -141,7 +151,7 @@ export const getSoilHealthSummary = async (field: Field, latestData: any): Promi
   try {
     const response = await aiProvider.generate({
       model: MODEL_NAME,
-      contents: `Provide a Soil Restoration Strategy focusing on pH, Moisture and NPK balance. Analyze how pH ${latestData.ph_level} affects nutrient availability: ${formatDataForPrompt({...latestData, ...field})}`,
+      contents: `Provide Soil Restoration Strategy for these specific pillars. Ignore missing sensors. ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -164,7 +174,7 @@ export const getManagementPrescriptions = async (field: Field, latestData: any):
   try {
     const response = await aiProvider.generate({
       model: MODEL_NAME,
-      contents: `Create exact irrigation and nutrient prescriptions for these specific pillars: ${formatDataForPrompt({...latestData, ...field})}`,
+      contents: `Create management prescriptions for these registered sensors only. ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -213,7 +223,7 @@ export const getDetailedManagementPlan = async (field: Field, latestData: any) =
   try {
     const response = await aiProvider.generate({
       model: MODEL_NAME,
-      contents: `Build a 4-step Operational Roadmap. Step 1 must address Moisture/Temp, Step 2 pH, Step 3 NPK, and Step 4 Long-term health: ${formatDataForPrompt({...latestData, ...field})}`,
+      contents: `Build a 4-step Operational Roadmap based ONLY on these detected sensors. ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -240,37 +250,41 @@ export const getDetailedManagementPlan = async (field: Field, latestData: any) =
 // --- DYNAMIC DATA-AWARE FALLBACKS ---
 
 const getFallbackCrops = (data: any): CropRecommendation[] => {
-  const isDry = (data.moisture || 45) < 20;
+  const isDry = data.moisture !== undefined && data.moisture < 20;
   return [
-    { name: isDry ? "Millets" : "Hybrid Rice", suitability: 90, yield: isDry ? "2.0t/ha" : "7.5t/ha", requirements: "Resilient to current temp.", fertilizer: "Urea (High Nitrogen)", icon: "fa-wheat-awn" },
-    { name: "Potato", suitability: 82, yield: "22t/ha", requirements: "Needs loose soil.", fertilizer: "MOP (Potassium rich)", icon: "fa-potato" },
-    { name: "Eggplant", suitability: 75, yield: "18t/ha", requirements: "High Nitrogen needs.", fertilizer: "Organic Compost", icon: "fa-seedling" }
+    { name: isDry ? "Millets" : "Hybrid Rice", suitability: 90, yield: isDry ? "2.0t/ha" : "7.5t/ha", requirements: "Resilient to current profile.", fertilizer: "Urea", icon: "fa-wheat-awn" },
+    { name: "Potato", suitability: 82, yield: "22t/ha", requirements: "Needs loose soil.", fertilizer: "MOP", icon: "fa-potato" },
+    { name: "Eggplant", suitability: 75, yield: "18t/ha", requirements: "High Nitrogen needs.", fertilizer: "Organic", icon: "fa-seedling" }
   ];
 };
 
 const getFallbackSoilInsight = (data: any): SoilInsight => {
-  const isDry = (data.moisture || 45) < 20;
-  const isAcidic = (data.ph_level || 6.5) < 5.5;
+  const hasMoisture = data.moisture !== undefined;
+  const isDry = hasMoisture && data.moisture < 20;
   return {
-    summary: `Restoration priority: ${isDry ? 'WATER REPLENISHMENT' : (isAcidic ? 'pH CORRECTION' : 'NUTRIENT BOOST')}. Sensors show ${data.moisture.toFixed(0)}% moisture and ${data.ph_level.toFixed(1)} pH.`,
-    soil_fertilizer: isAcidic ? "Apply 250kg Agricultural Lime to neutralize acidity." : (isDry ? "Deep-bore irrigation required immediately." : "Apply 100kg balanced NPK complex.")
+    summary: hasMoisture 
+      ? `System diagnostics focusing on ${isDry ? 'water replenishment' : 'soil stability'}.`
+      : "Awaiting primary sensor registration for moisture profiling.",
+    soil_fertilizer: isDry ? "Priority: Drip irrigation cycle." : "Register pH probe for accurate NPK strategy."
   };
 };
 
 const getFallbackPrescription = (data: any): ManagementPrescription => {
-  const isDry = (data.moisture || 45) < 20;
+  const isDry = data.moisture !== undefined && data.moisture < 20;
   return {
-    irrigation: { needed: isDry, volume: isDry ? "15,000L/ha" : "Maintain monitoring", schedule: "Early Morning (5 AM)" },
-    nutrient: { needed: true, fertilizers: [{ type: "Urea", amount: "50kg" }, { type: "TSP", amount: "30kg" }], advice: "Apply after first irrigation cycle." }
+    irrigation: { needed: isDry, volume: isDry ? "12,000L/ha" : "Monitoring", schedule: "Pre-dawn" },
+    nutrient: { needed: data.npk_n !== undefined, fertilizers: [], advice: "NPK probe required for prescription." }
   };
 };
 
 const getFallbackPlan = (data: any) => {
-  const isDry = (data.moisture || 45) < 20;
-  return [
-    { priority: isDry ? "CRITICAL" : "NORMAL", title: "Moisture Sync", description: isDry ? "Immediate hydration required to prevent root wilting." : "Moisture levels stable, monitor daily.", icon: "fa-droplet" },
-    { priority: "HIGH", title: "pH Stabilization", description: "Ensure pH is within 6.0-7.0 range for NPK uptake.", icon: "fa-scale-balanced" },
-    { priority: "MEDIUM", title: "NPK Amendment", description: "Apply Phosphorus-rich fertilizer to boost root vigor.", icon: "fa-flask" },
-    { priority: "LOW", title: "Temperature Shielding", description: "Apply mulch if soil temp exceeds 30°C.", icon: "fa-sun" }
-  ];
+  const roadmap = [];
+  if (data.moisture !== undefined) roadmap.push({ priority: "HIGH", title: "Moisture Balance", description: "Correcting water volume based on FDR sensor.", icon: "fa-droplet" });
+  if (data.ph_level !== undefined) roadmap.push({ priority: "MEDIUM", title: "pH Correction", description: "Neutralizing soil based on probe data.", icon: "fa-scale-balanced" });
+  if (data.npk_n !== undefined) roadmap.push({ priority: "MEDIUM", title: "Nutrient Sync", description: "Applying supplement based on NPK analyzer.", icon: "fa-flask" });
+  
+  if (roadmap.length === 0) {
+    roadmap.push({ priority: "URGENT", title: "Sensor Installation", description: "No sensors detected. Please register hardware at the Sensors page.", icon: "fa-satellite-dish" });
+  }
+  return roadmap;
 };

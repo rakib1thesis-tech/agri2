@@ -47,25 +47,20 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
     
     try {
       const fieldSensors = await syncSensorsFromDb([field]);
-      const stats: any = { 
-        temperature: 25.0,
-        moisture: 45.0, 
-        ph_level: 6.5, 
-        npk_n: 50, 
-        npk_p: 40, 
-        npk_k: 60 
-      };
+      
+      // Strict data state - only values from registered sensors will be present
+      const stats: any = {};
       
       fieldSensors.forEach(s => {
         if (!s.last_reading) return;
         const t = s.sensor_type.toLowerCase();
-        if (t.includes('moisture')) stats.moisture = s.last_reading.value ?? stats.moisture;
-        if (t.includes('temp')) stats.temperature = s.last_reading.value ?? stats.temperature;
-        if (t.includes('ph')) stats.ph_level = s.last_reading.value ?? stats.ph_level;
+        if (t.includes('moisture')) stats.moisture = s.last_reading.value;
+        if (t.includes('temp')) stats.temperature = s.last_reading.value;
+        if (t.includes('ph')) stats.ph_level = s.last_reading.value;
         if (t.includes('npk')) { 
-          stats.npk_n = s.last_reading.n ?? stats.npk_n; 
-          stats.npk_p = s.last_reading.p ?? stats.npk_p; 
-          stats.npk_k = s.last_reading.k ?? stats.npk_k; 
+          stats.npk_n = s.last_reading.n; 
+          stats.npk_p = s.last_reading.p; 
+          stats.npk_k = s.last_reading.k; 
         }
       });
       setCurrentDataState(stats);
@@ -107,7 +102,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       <div className="flex justify-between items-center mb-12">
         <div>
           <h1 className="text-3xl font-black text-slate-900 tracking-tight">Agricare Intelligence Hub</h1>
-          <p className="text-slate-500 text-sm mt-1">Real-time diagnostics synthesized from 4 critical sensor pillars.</p>
+          <p className="text-slate-500 text-sm mt-1">Real-time diagnostics synthesized from registered sensor pillars.</p>
         </div>
         <button 
           onClick={() => setShowAddFieldModal(true)} 
@@ -173,12 +168,12 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     {[
-                      { label: 'Moisture', val: `${currentDataState?.moisture?.toFixed(1) || '--'}%`, icon: 'fa-droplet', color: 'text-blue-400' },
-                      { label: 'pH Level', val: currentDataState?.ph_level?.toFixed(1) || '--', icon: 'fa-scale-balanced', color: 'text-purple-400' },
-                      { label: 'Temperature', val: `${currentDataState?.temperature?.toFixed(1) || '--'}°C`, icon: 'fa-temperature-half', color: 'text-orange-400' },
-                      { label: 'NPK Balance', val: currentDataState?.npk_n != null ? 'Synced' : '--', icon: 'fa-vial', color: 'text-emerald-400' }
+                      { label: 'Moisture', val: currentDataState?.moisture != null ? `${currentDataState.moisture.toFixed(1)}%` : 'Sensor Required', icon: 'fa-droplet', color: 'text-blue-400', active: currentDataState?.moisture != null },
+                      { label: 'pH Level', val: currentDataState?.ph_level != null ? currentDataState.ph_level.toFixed(1) : 'Sensor Required', icon: 'fa-scale-balanced', color: 'text-purple-400', active: currentDataState?.ph_level != null },
+                      { label: 'Temperature', val: currentDataState?.temperature != null ? `${currentDataState.temperature.toFixed(1)}°C` : 'Sensor Required', icon: 'fa-temperature-half', color: 'text-orange-400', active: currentDataState?.temperature != null },
+                      { label: 'NPK Balance', val: currentDataState?.npk_n != null ? 'Synced' : 'Sensor Required', icon: 'fa-vial', color: 'text-emerald-400', active: currentDataState?.npk_n != null }
                     ].map((p, i) => (
-                      <div key={i} className="bg-white/5 border border-white/10 p-4 rounded-2xl flex items-center gap-4 backdrop-blur-sm">
+                      <div key={i} className={`bg-white/5 border border-white/10 p-4 rounded-2xl flex items-center gap-4 backdrop-blur-sm transition-opacity ${p.active ? 'opacity-100' : 'opacity-40'}`}>
                         <i className={`fas ${p.icon} ${p.color} text-lg`}></i>
                         <div>
                           <div className="text-[8px] font-black uppercase text-slate-400 tracking-widest">{p.label}</div>
@@ -193,8 +188,8 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
               {loading ? (
                 <div className="bg-white p-32 text-center rounded-[3rem] border border-slate-100 shadow-sm flex flex-col items-center">
                   <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-8"></div>
-                  <h3 className="text-2xl font-black text-slate-800">Processing Telemetry Vectors...</h3>
-                  <p className="text-slate-400 mt-2">Correlating Moisture, Temp, and NPK for restoration logic.</p>
+                  <h3 className="text-2xl font-black text-slate-800">Processing Registered Telemetry...</h3>
+                  <p className="text-slate-400 mt-2">Gemini 2.5 Flash is analyzing your specific field pillars.</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
