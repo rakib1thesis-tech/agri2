@@ -84,7 +84,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       setManagementPlan(plan);
       setAiConnected(await isAiReady());
     } catch (err) {
-      setAiSummary("Communication with the AI node failed. Please ensure your central API key is active.");
+      setAiSummary("Cloud connection error. Verify shared API key in host environment.");
     } finally {
       setLoading(false);
     }
@@ -108,7 +108,6 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 min-h-screen">
-      {/* Top Header */}
       <div className="flex justify-between items-center mb-12">
         <div>
           <h1 className="text-3xl font-black text-slate-900">Field Command Center</h1>
@@ -123,7 +122,6 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-        {/* Sidebar: YOUR FIELDS */}
         <div className="lg:col-span-1 space-y-4">
           <div className="flex justify-between items-center px-2">
             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Your Fields</h3>
@@ -151,7 +149,6 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
           </div>
         </div>
 
-        {/* Main Area */}
         <div className="lg:col-span-3">
           {!selectedField ? (
             <div className="bg-white rounded-[3rem] p-32 text-center border-dashed border-2 border-slate-200 flex flex-col items-center">
@@ -162,7 +159,6 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
             </div>
           ) : (
             <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-700">
-              {/* Field Hero Summary Card */}
               <div className="bg-slate-900 p-10 rounded-[3rem] text-white shadow-2xl relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-80 h-80 bg-emerald-500/10 blur-[100px] rounded-full"></div>
                 <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-8">
@@ -177,7 +173,6 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                     <p className="text-slate-400 mt-2 text-lg font-medium">{selectedField.location} • {selectedField.size} Hectares</p>
                   </div>
                   
-                  {/* Real-time Stat Pills */}
                   <div className="bg-white/5 backdrop-blur-xl p-6 rounded-[2.5rem] border border-white/10 flex flex-wrap gap-6 items-center">
                     <div className={`flex items-center gap-3 text-sm font-bold ${currentDataState?.moisture ? 'text-emerald-400' : 'text-slate-600'}`}>
                       <i className={`fas ${currentDataState?.moisture ? 'fa-check-circle' : 'fa-circle-xmark opacity-20'}`}></i>
@@ -206,7 +201,6 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                   <div className="lg:col-span-2 space-y-8">
-                    {/* Health Insights Card */}
                     <div className="bg-white p-10 rounded-[3rem] border border-emerald-50 shadow-sm hover:shadow-xl transition-shadow relative overflow-hidden group">
                       <div className="absolute top-0 right-0 p-8 text-emerald-500/5 text-8xl transition-transform group-hover:scale-110">
                         <i className="fas fa-dna"></i>
@@ -216,12 +210,21 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                       </h3>
                       <div className={`p-8 rounded-[2.5rem] ${!aiConnected ? 'bg-red-50 text-red-700' : 'bg-emerald-50/50 text-slate-700'} border border-emerald-50`}>
                         <p className="text-lg leading-relaxed font-medium">
-                          {aiSummary || (aiConnected ? "Awaiting model response for sensor packets..." : "AI Analysis is currently offline. Please ensure your central API key is correctly configured in the environment.")}
+                          {aiSummary || (aiConnected ? "Awaiting model response for sensor packets..." : "AI Analysis is currently offline. Please ensure your central VITE_API_KEY is correctly configured.")}
                         </p>
+                        {!aiConnected && (
+                          <div className="mt-6 text-sm bg-white/50 p-6 rounded-2xl border border-red-200">
+                            <p className="font-bold mb-2">Instructions to activate AI:</p>
+                            <ol className="list-decimal list-inside space-y-2 text-red-900 font-semibold">
+                              <li>Add <code className="bg-red-100 px-1 rounded">VITE_API_KEY</code> to Cloudflare Pages Variables.</li>
+                              <li>Change build command to: <code className="bg-red-100 px-1 rounded">VITE_API_KEY=$VITE_API_KEY npm run build</code></li>
+                              <li>Retry the deployment.</li>
+                            </ol>
+                          </div>
+                        )}
                       </div>
                     </div>
                     
-                    {/* Crop Suitability Index */}
                     <div>
                       <h3 className="font-bold text-2xl text-slate-900 mb-8 flex items-center gap-3 px-4">
                         <i className="fas fa-chart-pie text-emerald-600"></i> Crop Suitability Index
@@ -256,7 +259,6 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                     </div>
                   </div>
                   
-                  {/* Sidebar Right: Roadmap */}
                   <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm h-fit sticky top-24">
                     <h3 className="font-bold text-2xl text-slate-900 mb-10 flex items-center gap-3">
                       <i className="fas fa-list-check text-emerald-600"></i> Localized Roadmap
@@ -284,11 +286,6 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                         </div>
                       )}
                     </div>
-                    {managementPlan && managementPlan.length > 0 && (
-                      <button className="w-full mt-10 py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-800 transition-colors shadow-lg">
-                        Export Health Strategy
-                      </button>
-                    )}
                   </div>
                 </div>
               )}
@@ -297,7 +294,6 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
         </div>
       </div>
 
-      {/* Add Field Modal */}
       {showAddFieldModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
           <div className="bg-white rounded-[3rem] w-full max-w-md p-10 shadow-2xl animate-in zoom-in duration-300">

@@ -4,29 +4,43 @@ import { Field } from "../types";
 
 /**
  * Safely retrieves the API key from the environment.
- * Modern bundlers inject these at build time.
+ * In a production build, the build tool replaces 'process.env.VITE_API_KEY' 
+ * with the actual string value of your key.
  */
 const getSafeApiKey = () => {
   try {
-    // Check for VITE_ prefix (Vite), process.env (Webpack/Cloudflare), or global window variables
-    const key = 
-      (typeof process !== 'undefined' && process.env ? (process.env.VITE_API_KEY || process.env.API_KEY) : null) || 
-      (window as any).VITE_API_KEY || 
-      (window as any).API_KEY;
-      
-    return (key && key !== "undefined" && key !== "") ? key : null;
+    // 1. Check for standard Vite/React-Scripts build injection
+    if (typeof process !== 'undefined' && process.env) {
+      if (process.env.VITE_API_KEY) return process.env.VITE_API_KEY;
+      if (process.env.API_KEY) return process.env.API_KEY;
+    }
+    
+    // 2. Fallback for environments where process.env is mapped to window
+    const win = window as any;
+    if (win.VITE_API_KEY) return win.VITE_API_KEY;
+    if (win.API_KEY) return win.API_KEY;
+
+    // 3. Last resort: check if the build tool performed a direct string replacement
+    // Note: Some build tools replace "process.env.VAR" with the literal string.
+    const injectedKey = "process.env.VITE_API_KEY";
+    if (injectedKey !== "process.env.VITE_API_KEY" && injectedKey !== "") {
+      return injectedKey;
+    }
+
+    return null;
   } catch (e) {
     return null;
   }
 };
 
 export const isAiReady = async () => {
-  return !!getSafeApiKey();
+  const key = getSafeApiKey();
+  return !!key && key !== "undefined" && key !== "null";
 };
 
 const getAIClient = () => {
   const apiKey = getSafeApiKey();
-  if (!apiKey) {
+  if (!apiKey || apiKey === "undefined") {
     throw new Error("API_KEY_NOT_FOUND");
   }
   return new GoogleGenAI({ apiKey });
@@ -71,6 +85,7 @@ export const getCropAnalysis = async (field: Field, latestData: any) => {
     });
     return JSON.parse(response.text || "[]");
   } catch (error) {
+    console.error("AI Crop Analysis failed:", error);
     return [];
   }
 };
@@ -85,9 +100,9 @@ export const getSoilHealthSummary = async (field: Field, latestData: any) => {
     return response.text || "Analysis complete.";
   } catch (error: any) {
     if (error.message === "API_KEY_NOT_FOUND") {
-      return "AI Connection Error: The API key was not detected in the current build. Please verify that your environment variable is correctly injected into the application bundle.";
+      return "AI OFFLINE: Key not detected in build. Ensure Cloudflare Settings > Variables contains VITE_API_KEY and Build Command uses VITE_API_KEY=$VITE_API_KEY.";
     }
-    return "AI Node connecting...";
+    return "Analysis engine is warming up. Please refresh in a moment.";
   }
 };
 
@@ -95,7 +110,7 @@ export const getDetailedManagementPlan = async (field: Field, latestData: any) =
   try {
     const ai = getAIClient();
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-3-pro-preview",
       contents: `Provide 4 improvement steps for ${field.field_name}. ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
         responseMimeType: "application/json",
@@ -116,6 +131,7 @@ export const getDetailedManagementPlan = async (field: Field, latestData: any) =
     });
     return JSON.parse(response.text || "[]");
   } catch (error) {
+    console.error("AI Management Plan failed:", error);
     return [];
   }
 };
