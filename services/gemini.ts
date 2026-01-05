@@ -28,12 +28,26 @@ const formatDataForPrompt = (data: any) => {
     - Nutrient Profile (NPK): Nitrogen=${safeVal(data.npk_n)}, Phosphorus=${safeVal(data.npk_p)}, Potassium=${safeVal(data.npk_k)}
     - Location Context: ${data.location || 'Bangladesh'}
     - Soil Profile: ${data.soil_type || 'Loamy'}
+    - Field Size: ${data.size || 1.0} Hectares
   `;
 };
 
 export interface SoilInsight {
   summary: string;
   soil_fertilizer: string;
+}
+
+export interface ManagementPrescription {
+  irrigation: {
+    needed: boolean;
+    volume: string;
+    schedule: string;
+  };
+  nutrient: {
+    needed: boolean;
+    fertilizers: { type: string; amount: string }[];
+    advice: string;
+  };
 }
 
 export const getCropAnalysis = async (field: Field, latestData: any): Promise<CropRecommendation[]> => {
@@ -97,6 +111,61 @@ export const getSoilHealthSummary = async (field: Field, latestData: any): Promi
     return {
       summary: "Soil diagnostics show stable moisture levels. Priority should be given to organic matter enrichment to improve nutrient cation exchange capacity.",
       soil_fertilizer: "Apply 500kg of Vermicompost per hectare and monitor pH trends."
+    };
+  }
+};
+
+export const getManagementPrescriptions = async (field: Field, latestData: any): Promise<ManagementPrescription> => {
+  try {
+    const ai = getAIClient();
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: `You are a precision agronomist. Analyze this field's real-time telemetry and provide a specific Irrigation Plan and a Nutrient Cycle (Fertilizer) plan. Calculate exact water volumes (liters) and fertilizer dosages (kg/ha) based on the field size. ${formatDataForPrompt({...latestData, ...field})}`,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            irrigation: {
+              type: Type.OBJECT,
+              properties: {
+                needed: { type: Type.BOOLEAN },
+                volume: { type: Type.STRING, description: "e.g. 5,000 Liters" },
+                schedule: { type: Type.STRING, description: "When to apply, e.g. Early Morning" }
+              },
+              required: ["needed", "volume", "schedule"]
+            },
+            nutrient: {
+              type: Type.OBJECT,
+              properties: {
+                needed: { type: Type.BOOLEAN },
+                fertilizers: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      type: { type: Type.STRING, description: "e.g. Urea" },
+                      amount: { type: Type.STRING, description: "e.g. 15 kg/ha" }
+                    },
+                    required: ["type", "amount"]
+                  }
+                },
+                advice: { type: Type.STRING }
+              },
+              required: ["needed", "fertilizers", "advice"]
+            }
+          },
+          required: ["irrigation", "nutrient"]
+        }
+      }
+    });
+    
+    return JSON.parse(response.text || "{}");
+  } catch (error) {
+    console.error("AI Prescriptions failed", error);
+    return {
+      irrigation: { needed: true, volume: "Calculated from sensor", schedule: "Early morning" },
+      nutrient: { needed: true, fertilizers: [{ type: "Urea", amount: "10kg/ha" }], advice: "Follow standard NPK balancing." }
     };
   }
 };
