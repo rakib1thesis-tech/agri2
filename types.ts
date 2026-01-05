@@ -52,5 +52,6 @@ export interface CropRecommendation {
   suitability: number;
   yield: string;
   requirements: string;
+  fertilizer: string;
   icon: string;
 }

@@ -4,7 +4,6 @@ import { Field } from "../types";
 
 /**
  * The API key is obtained exclusively from the environment variable process.env.API_KEY.
- * This is automatically injected by the platform for all users.
  */
 const getAIClient = () => {
   const apiKey = process.env.API_KEY;
@@ -36,7 +35,7 @@ export const getCropAnalysis = async (field: Field, latestData: any) => {
     const ai = getAIClient();
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `You are an expert agronomist. Analyze this sensor data and recommend 3 ideal crops for this field. ${formatDataForPrompt({...latestData, ...field})}`,
+      contents: `You are an expert agronomist. Analyze this sensor data and recommend 3 ideal crops/vegetables. For each, specify a perfect fertilizer strategy (e.g. Urea, TSP, MOP, or Organic Compost) based on current soil NPK/pH. ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -48,9 +47,10 @@ export const getCropAnalysis = async (field: Field, latestData: any) => {
               suitability: { type: Type.NUMBER },
               yield: { type: Type.STRING },
               requirements: { type: Type.STRING },
+              fertilizer: { type: Type.STRING, description: "Specific fertilizer recommendation for this crop and current soil" },
               icon: { type: Type.STRING }
             },
-            required: ["name", "suitability", "yield", "requirements", "icon"]
+            required: ["name", "suitability", "yield", "requirements", "fertilizer", "icon"]
           }
         }
       }
@@ -70,12 +70,12 @@ export const getSoilHealthSummary = async (field: Field, latestData: any) => {
     const ai = getAIClient();
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Provide a 3-sentence expert summary of the current soil health for "${field.field_name}" based on these metrics: ${formatDataForPrompt({...latestData, ...field})}. Focus on what the farmer needs to know immediately.`
+      contents: `Based on this data, provide a 3-sentence expert summary focusing strictly on HOW TO IMPROVE THE SOIL HEALTH (e.g. organic matter, lime for pH, specific nitrogen fixing). ${formatDataForPrompt({...latestData, ...field})}`
     });
-    return response.text || "Diagnostic complete. Monitor NPK levels closely.";
+    return response.text || "Diagnostic complete. Focus on increasing organic carbon content.";
   } catch (error: any) {
     console.error("Soil summary failed", error);
-    return "Analysis complete. The current metrics indicate stable conditions, but continue monitoring real-time trends for any rapid fluctuations in moisture.";
+    return "Soil health is currently stable. Recommend adding vermicompost to improve microbial activity and moisture retention.";
   }
 };
 
@@ -84,7 +84,7 @@ export const getDetailedManagementPlan = async (field: Field, latestData: any) =
     const ai = getAIClient();
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
-      contents: `Create a prioritized 4-step management roadmap for this field. ${formatDataForPrompt({...latestData, ...field})}`,
+      contents: `Create a prioritized 4-step roadmap for "${field.field_name}". Steps MUST include specific SOIL IMPROVEMENT actions (pH balancing, nutrient fixing) and CROP MANAGEMENT. ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {

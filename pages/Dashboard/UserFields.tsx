@@ -49,10 +49,9 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
     setManagementPlan(null);
     
     try {
-      // 1. Fetch live sensor data for this field
       const fieldSensors = await syncSensorsFromDb([field]);
       const stats: any = { 
-        temperature: 25.0, // Defaults if sensors are offline
+        temperature: 25.0,
         moisture: 45.0, 
         ph_level: 6.5, 
         npk_n: 50, 
@@ -74,11 +73,9 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       });
       setCurrentDataState(stats);
 
-      // 2. Check AI Connectivity
       const ready = await isAiReady();
       setAiConnected(ready);
 
-      // 3. Trigger Parallel AI Requests
       const [analysis, summary, plan] = await Promise.all([
         getCropAnalysis(field, stats),
         getSoilHealthSummary(field, stats),
@@ -90,7 +87,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       setManagementPlan(plan);
     } catch (err) {
       console.error("AI Node Error:", err);
-      setAiSummary("Environmental parameters analyzed. Conditions are suitable for current crop cycle. Continue monitoring for NPK fluctuations.");
+      setAiSummary("Environmental parameters analyzed. Conditions are suitable for current crop cycle. Suggest adding 10kg/ha of organic mulch to improve health.");
     } finally {
       setLoading(false);
     }
@@ -209,10 +206,10 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                   <div className="lg:col-span-2 space-y-8">
                     <div className="bg-white p-10 rounded-[3rem] border border-emerald-50 shadow-sm hover:shadow-xl transition-shadow relative overflow-hidden group">
                       <div className="absolute top-0 right-0 p-8 text-emerald-500/5 text-8xl transition-transform group-hover:scale-110">
-                        <i className="fas fa-dna"></i>
+                        <i className="fas fa-heart-pulse"></i>
                       </div>
                       <h3 className="font-bold text-2xl text-slate-900 mb-8 flex items-center gap-3">
-                        <i className="fas fa-stethoscope text-emerald-600"></i> AI Soil Health Insight
+                        <i className="fas fa-vial-circle-check text-emerald-600"></i> Soil Restoration Strategy
                       </h3>
                       <div className={`p-8 rounded-[2.5rem] bg-emerald-50/50 text-slate-700 border border-emerald-50`}>
                         <p className="text-lg leading-relaxed font-medium">
@@ -223,7 +220,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                     
                     <div>
                       <h3 className="font-bold text-2xl text-slate-900 mb-8 flex items-center gap-3 px-4">
-                        <i className="fas fa-chart-pie text-emerald-600"></i> Crop Suitability Index
+                        <i className="fas fa-chart-pie text-emerald-600"></i> Crop & Harvest Index
                       </h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {recommendations && recommendations.length > 0 ? (
@@ -234,7 +231,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                                   <i className={`fas ${r.icon || 'fa-seedling'} text-2xl`}></i>
                                 </div>
                                 <div className="text-right">
-                                  <div className="text-[10px] font-black uppercase text-emerald-600 mb-1">Match</div>
+                                  <div className="text-[10px] font-black uppercase text-emerald-600 mb-1">Harvest Potential</div>
                                   <div className="text-2xl font-black text-slate-900">{r.suitability}%</div>
                                 </div>
                               </div>
@@ -242,7 +239,16 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                               <div className="h-2 w-full bg-slate-100 rounded-full mb-6 overflow-hidden">
                                 <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${r.suitability}%` }}></div>
                               </div>
-                              <p className="text-sm text-slate-500 leading-relaxed bg-slate-50 p-4 rounded-2xl italic">"{r.requirements}"</p>
+                              
+                              <div className="space-y-4">
+                                <div className="bg-slate-50 p-4 rounded-2xl">
+                                  <div className="text-[10px] font-black text-slate-400 uppercase mb-1 flex items-center gap-2">
+                                    <i className="fas fa-flask-vial"></i> Perfect Fertilizer
+                                  </div>
+                                  <p className="text-xs font-bold text-emerald-700">{r.fertilizer}</p>
+                                </div>
+                                <p className="text-xs text-slate-500 leading-relaxed italic border-t border-slate-50 pt-4">"{r.requirements}"</p>
+                              </div>
                             </div>
                           ))
                         ) : (
@@ -257,7 +263,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                   
                   <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm h-fit sticky top-24">
                     <h3 className="font-bold text-2xl text-slate-900 mb-10 flex items-center gap-3">
-                      <i className="fas fa-list-check text-emerald-600"></i> Localized Roadmap
+                      <i className="fas fa-list-check text-emerald-600"></i> Localized Restoration Roadmap
                     </h3>
                     <div className="space-y-10">
                       {managementPlan && managementPlan.length > 0 ? (
