@@ -23,7 +23,6 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
   const [soilInsight, setSoilInsight] = useState<SoilInsight | null>(null);
   const [managementPlan, setManagementPlan] = useState<ManagementTask[] | null>(null);
   const [loading, setLoading] = useState(false);
-  const [aiActive, setAiActive] = useState(false);
   const [currentDataState, setCurrentDataState] = useState<any>(null);
   const [showAddFieldModal, setShowAddFieldModal] = useState(false);
   const [newFieldData, setNewFieldData] = useState({ name: '', location: '', size: '', soilType: 'Loamy' });
@@ -32,24 +31,12 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
     const init = async () => {
       const userFields = await syncFields(user.id);
       setFields(userFields);
-      
-      const hasKey = await (window as any).aistudio.hasSelectedApiKey();
-      setAiActive(hasKey);
-
       if (userFields.length > 0) {
         handleFieldSelect(userFields[0]);
       }
     };
     init();
   }, [user.id]);
-
-  const handleActivateAi = async () => {
-    await (window as any).aistudio.openSelectKey();
-    setAiActive(true);
-    if (selectedField) {
-      handleFieldSelect(selectedField);
-    }
-  };
 
   const handleFieldSelect = async (field: Field) => {
     setSelectedField(field);
@@ -83,11 +70,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       });
       setCurrentDataState(stats);
 
-      // Check key state before AI calls
-      const hasKey = await (window as any).aistudio.hasSelectedApiKey();
-      setAiActive(hasKey);
-
-      // AI calls proceed (gemini.ts handles the key via process.env.API_KEY internally)
+      // AI calls proceed automatically using process.env.API_KEY
       const [analysis, insight, plan] = await Promise.all([
         getCropAnalysis(field, stats),
         getSoilHealthSummary(field, stats),
@@ -127,22 +110,12 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
           <h1 className="text-3xl font-black text-slate-900">Agricare Intelligence Hub</h1>
           <p className="text-slate-500 text-sm mt-1">Real-time soil diagnostics synthesized by shared Gemini AI nodes.</p>
         </div>
-        <div className="flex gap-4">
-          {!aiActive && (
-            <button 
-              onClick={handleActivateAi}
-              className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-800 transition-all shadow-lg active:scale-95"
-            >
-              <i className="fas fa-key"></i> Sync Shared API
-            </button>
-          )}
-          <button 
-            onClick={() => setShowAddFieldModal(true)} 
-            className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-emerald-700 transition-all shadow-lg active:scale-95"
-          >
-            <i className="fas fa-plus"></i> Add New Field
-          </button>
-        </div>
+        <button 
+          onClick={() => setShowAddFieldModal(true)} 
+          className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-emerald-700 transition-all shadow-lg active:scale-95"
+        >
+          <i className="fas fa-plus"></i> Add New Field
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
@@ -189,9 +162,9 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                 <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-8">
                   <div>
                     <div className="flex items-center gap-3 mb-4">
-                      <div className={`flex items-center gap-2 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${aiActive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-orange-500/20 text-orange-400'}`}>
-                        <i className={`fas ${aiActive ? 'fa-robot' : 'fa-triangle-exclamation'}`}></i>
-                        {aiActive ? 'Shared AI Active' : 'API Key Required'}
+                      <div className="flex items-center gap-2 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest bg-emerald-500/20 text-emerald-400">
+                        <i className="fas fa-robot"></i>
+                        AI Node Connected
                       </div>
                     </div>
                     <h2 className="text-5xl font-black tracking-tight">{selectedField.field_name}</h2>
@@ -300,11 +273,6 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                           <div className="col-span-full py-20 bg-slate-50 rounded-[3rem] border border-dashed text-center text-slate-300">
                             <i className="fas fa-robot text-4xl mb-4 block opacity-20"></i>
                             <p className="font-bold">Collecting baseline metrics for harvest analysis.</p>
-                            {!aiActive && (
-                              <button onClick={handleActivateAi} className="mt-4 text-emerald-600 font-bold hover:underline">
-                                Click to Activate Shared AI
-                              </button>
-                            )}
                           </div>
                         )}
                       </div>
