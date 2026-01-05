@@ -131,19 +131,19 @@ const Management: React.FC<{ user: User }> = ({ user }) => {
     <div className="max-w-7xl mx-auto px-4 py-10">
       <div className="mb-10">
         <h1 className="text-3xl font-black text-slate-900">AI Farm Management Hub</h1>
-        <p className="text-slate-500 mt-1">Shared Gemini-3 Processing: Real-time prescriptions based on live telemetry.</p>
+        <p className="text-slate-500 mt-1">Real-time agricultural prescriptions synthesized from live telemetry.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
           <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-            <i className="fas fa-robot text-emerald-600"></i> AI Advisory Directives
+            <i className="fas fa-microscope text-emerald-600"></i> Active Management Directives
           </h2>
           
           {loading ? (
             <div className="py-20 text-center bg-white rounded-[2.5rem] border border-slate-100">
                <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-               <p className="text-slate-400 font-medium">Connecting to Shared AI Node...</p>
+               <p className="text-slate-400 font-medium">Synchronizing Intelligence Nodes...</p>
             </div>
           ) : fieldData.length > 0 ? fieldData.map((item) => {
             const { field, data, irrigation, nutrient, aiLoading } = item;
@@ -157,10 +157,10 @@ const Management: React.FC<{ user: User }> = ({ user }) => {
                   </div>
                   {aiLoading ? (
                     <div className="flex items-center gap-2 text-[10px] font-black uppercase text-emerald-600 animate-pulse">
-                      <i className="fas fa-spinner fa-spin"></i> Analyzing...
+                      <i className="fas fa-spinner fa-spin"></i> Processing...
                     </div>
                   ) : (
-                    <div className="text-[10px] bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full font-black uppercase tracking-widest">AI Synced</div>
+                    <div className="text-[10px] bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full font-black uppercase tracking-widest">AI Status: Verified</div>
                   )}
                 </div>
                 
@@ -171,7 +171,7 @@ const Management: React.FC<{ user: User }> = ({ user }) => {
                       <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${irrigation.needed ? 'bg-blue-500 text-white shadow-lg shadow-blue-100' : 'bg-slate-200 text-slate-400'}`}>
                         <i className="fas fa-droplet text-lg"></i>
                       </div>
-                      <h4 className="font-black text-slate-900 uppercase text-sm tracking-tight">Irrigation Plan</h4>
+                      <h4 className="font-black text-slate-900 uppercase text-sm tracking-tight">Irrigation Strategy</h4>
                     </div>
                     {aiLoading ? (
                       <div className="space-y-2">
@@ -180,12 +180,12 @@ const Management: React.FC<{ user: User }> = ({ user }) => {
                       </div>
                     ) : irrigation.needed ? (
                       <div>
-                        <div className="text-[10px] font-black text-blue-700 uppercase mb-2 tracking-widest">Deficit Advisory</div>
-                        <p className="text-sm text-blue-900 mb-1 font-bold">Apply {irrigation.volume}</p>
-                        <p className="text-xs text-blue-600 italic">Schedule: {irrigation.schedule}</p>
+                        <div className="text-[10px] font-black text-blue-700 uppercase mb-2 tracking-widest">Soil Deficit Warning</div>
+                        <p className="text-sm text-blue-900 mb-1 font-bold">Recommended: {irrigation.volume}</p>
+                        <p className="text-xs text-blue-600 italic">Preferred: {irrigation.schedule}</p>
                       </div>
                     ) : (
-                      <p className="text-xs text-slate-500 font-medium">Hydration levels optimal ({data.moisture.toFixed(1)}%). No action required.</p>
+                      <p className="text-xs text-slate-500 font-medium">Field hydration optimal ({data.moisture.toFixed(1)}%). No immediate intervention.</p>
                     )}
                   </div>
 
@@ -193,7 +193,7 @@ const Management: React.FC<{ user: User }> = ({ user }) => {
                   <div className={`p-6 rounded-[2rem] border transition-all ${nutrient.needed ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-50 border-slate-50 opacity-60'}`}>
                     <div className="flex items-center gap-3 mb-4">
                       <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${nutrient.needed ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-100' : 'bg-slate-200 text-slate-400'}`}>
-                        <i className="fas fa-flask text-lg"></i>
+                        <i className="fas fa-vial text-lg"></i>
                       </div>
                       <h4 className="font-black text-slate-900 uppercase text-sm tracking-tight">Nutrient Cycle</h4>
                     </div>
@@ -215,7 +215,7 @@ const Management: React.FC<{ user: User }> = ({ user }) => {
                         <p className="text-[11px] text-emerald-800 leading-tight italic">"{nutrient.advice}"</p>
                       </div>
                     ) : (
-                      <p className="text-xs text-slate-500 font-medium">N-P-K concentrations balanced. Maintenance only.</p>
+                      <p className="text-xs text-slate-500 font-medium">N-P-K concentration balance established. No supplement required.</p>
                     )}
                   </div>
                 </div>
@@ -225,7 +225,7 @@ const Management: React.FC<{ user: User }> = ({ user }) => {
             <div className="bg-white p-20 rounded-[3rem] border border-dashed border-slate-200 text-center text-slate-400">
               <i className="fas fa-folder-open text-5xl mb-6 opacity-20"></i>
               <p className="text-lg font-bold">No active fields detected.</p>
-              <p className="text-sm mt-1">Please add a field to initialize shared AI algorithms.</p>
+              <p className="text-sm mt-1">Please register a field to initialize AI algorithms.</p>
             </div>
           )}
         </div>
@@ -234,16 +234,16 @@ const Management: React.FC<{ user: User }> = ({ user }) => {
           <div className="bg-slate-900 rounded-[3rem] p-10 text-white shadow-2xl relative overflow-hidden">
             <div className="absolute bottom-0 right-0 w-48 h-48 bg-emerald-500 opacity-5 rounded-full translate-x-10 translate-y-10"></div>
             <h3 className="text-xl font-bold mb-8 flex items-center gap-2">
-              <i className="fas fa-microscope text-emerald-400"></i> AI Advisory Context
+              <i className="fas fa-brain text-emerald-400"></i> AI Advisory Context
             </h3>
             <div className="space-y-6">
               <div className="border-l-4 border-emerald-500 pl-4 bg-white/5 py-4 rounded-r-xl">
-                <div className="text-[10px] text-emerald-400 uppercase font-black tracking-widest mb-1">Stochastic Volumetric Model</div>
-                <p className="text-xs text-slate-300">Using deep-soil tensors to calculate exact liter deficit per ha.</p>
+                <div className="text-[10px] text-emerald-400 uppercase font-black tracking-widest mb-1">Volumetric Water Analysis</div>
+                <p className="text-xs text-slate-300">Calculating exact liter deficit per hectare based on soil porosity.</p>
               </div>
               <div className="border-l-4 border-blue-500 pl-4 bg-white/5 py-4 rounded-r-xl">
-                <div className="text-[10px] text-blue-400 uppercase font-black tracking-widest mb-1">Stoichiometric NPK Balance</div>
-                <p className="text-xs text-slate-300">Optimizing nutrient ionization for Bangladeshi soil profiles.</p>
+                <div className="text-[10px] text-blue-400 uppercase font-black tracking-widest mb-1">NPK Stoichiometry</div>
+                <p className="text-xs text-slate-300">Optimizing nutrient balance for regional soil profiles.</p>
               </div>
             </div>
             <button 
@@ -253,15 +253,6 @@ const Management: React.FC<{ user: User }> = ({ user }) => {
             >
               <i className="fas fa-file-pdf mr-2"></i> Export Advisory Report
             </button>
-          </div>
-          
-          <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm">
-            <h4 className="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
-              <i className="fas fa-info-circle text-emerald-500"></i> Shared AI Intelligence
-            </h4>
-            <p className="text-xs text-slate-500 leading-relaxed">
-              Prescriptions are updated in real-time as sensor data flows into the cloud. The Gemini-3 engine uses historical data to refine harvest windows for crops like Boro Rice and Winter Potato.
-            </p>
           </div>
         </div>
       </div>

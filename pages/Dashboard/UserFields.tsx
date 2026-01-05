@@ -108,7 +108,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       <div className="flex justify-between items-center mb-12">
         <div>
           <h1 className="text-3xl font-black text-slate-900">Agricare Intelligence Hub</h1>
-          <p className="text-slate-500 text-sm mt-1">Real-time soil diagnostics synthesized by shared Gemini AI nodes.</p>
+          <p className="text-slate-500 text-sm mt-1">Real-time soil diagnostics and automated harvest predictions.</p>
         </div>
         <button 
           onClick={() => setShowAddFieldModal(true)} 
@@ -163,8 +163,8 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                   <div>
                     <div className="flex items-center gap-3 mb-4">
                       <div className="flex items-center gap-2 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest bg-emerald-500/20 text-emerald-400">
-                        <i className="fas fa-robot"></i>
-                        AI Node Connected
+                        <i className="fas fa-microchip"></i>
+                        Agricare AI Synced
                       </div>
                     </div>
                     <h2 className="text-5xl font-black tracking-tight">{selectedField.field_name}</h2>
@@ -193,8 +193,8 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
               {loading && !recommendations ? (
                 <div className="bg-white p-32 text-center rounded-[3rem] border border-slate-100 shadow-sm flex flex-col items-center">
                   <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-8"></div>
-                  <h3 className="text-2xl font-black text-slate-800">Synthesizing Restoration Plan...</h3>
-                  <p className="text-slate-400 mt-2">Connecting to shared Gemini AI processing node for agronomical analysis.</p>
+                  <h3 className="text-2xl font-black text-slate-800">Synthesizing Field Analysis...</h3>
+                  <p className="text-slate-400 mt-2">Correlating telemetry for agronomical restoration steps.</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -206,7 +206,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                         <i className="fas fa-flask-vial"></i>
                       </div>
                       <h3 className="font-bold text-2xl text-slate-900 mb-6 flex items-center gap-3">
-                        <i className="fas fa-vial-circle-check text-emerald-600"></i> AI Soil Restoration Strategy
+                        <i className="fas fa-vial-circle-check text-emerald-600"></i> Soil Restoration Strategy
                       </h3>
                       
                       <div className="space-y-6">
@@ -234,7 +234,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                     {/* Crop Index */}
                     <div>
                       <h3 className="font-bold text-2xl text-slate-900 mb-8 flex items-center gap-3 px-4">
-                        <i className="fas fa-chart-line text-emerald-600"></i> AI High-Yield Crop & Harvest Index
+                        <i className="fas fa-chart-line text-emerald-600"></i> High-Yield Crop & Harvest Index
                       </h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {recommendations && recommendations.length > 0 ? (
@@ -282,7 +282,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                   {/* Right Roadmap Column */}
                   <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm h-fit sticky top-24">
                     <h3 className="font-bold text-2xl text-slate-900 mb-10 flex items-center gap-3">
-                      <i className="fas fa-list-check text-emerald-600"></i> AI Restoration Roadmap
+                      <i className="fas fa-list-check text-emerald-600"></i> Operational Roadmap
                     </h3>
                     <div className="space-y-10">
                       {managementPlan && managementPlan.length > 0 ? (

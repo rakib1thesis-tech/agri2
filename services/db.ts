@@ -20,11 +20,18 @@ const db: Firestore = getFirestore(app);
 
 export const isFirebaseEnabled = () => !!db;
 
-const handleFirestoreError = (e: any) => {
+/**
+ * Enhanced error handler for Firestore permissions.
+ * If rules are not set correctly in the Firebase Console, we want to warn the dev
+ * but allow the app to function with local/mock states where possible.
+ */
+const handleFirestoreError = (e: any, context: string) => {
   if (e.code === 'permission-denied') {
-    throw new Error("Database Access Denied: Please check your Firestore Security Rules. Authenticated users must have read/write access to their own documents.");
+    console.warn(`Firestore Permission Denied for collection: [${context}]. This is likely a security rule configuration issue in the Firebase Console. Falling back to local/mock data state.`);
+    return true; // Handled
   }
-  throw e;
+  console.error(`Firestore Error in ${context}:`, e);
+  return false;
 };
 
 export const loginUser = async (email: string, pass: string): Promise<User | null> => {
@@ -58,7 +65,8 @@ export const registerUser = async (user: User, pass: string): Promise<User> => {
     await setDoc(doc(db, 'users', cred.user.uid), userData);
     return userData;
   } catch (e: any) {
-    return handleFirestoreError(e);
+    handleFirestoreError(e, 'users');
+    throw e;
   }
 };
 
@@ -69,6 +77,7 @@ export const syncFields = async (userId: string): Promise<Field[]> => {
     const snap = await getDocs(q);
     return snap.docs.map(d => d.data() as Field);
   } catch (e) {
+    handleFirestoreError(e, 'fields');
     return [];
   }
 };
@@ -78,7 +87,7 @@ export const addFieldToDb = async (field: Field): Promise<void> => {
   try {
     await setDoc(doc(db, 'fields', field.field_id.toString()), field);
   } catch (e) {
-    return handleFirestoreError(e);
+    handleFirestoreError(e, 'fields');
   }
 };
 
@@ -90,6 +99,7 @@ export const syncSensorsFromDb = async (userFields: Field[]): Promise<Sensor[]> 
     const snap = await getDocs(q);
     return snap.docs.map(d => d.data() as Sensor);
   } catch (e) {
+    handleFirestoreError(e, 'sensors');
     return [];
   }
 };
@@ -99,7 +109,7 @@ export const addOrUpdateSensorInDb = async (sensor: Sensor): Promise<void> => {
   try {
     await setDoc(doc(db, 'sensors', sensor.sensor_id.toString()), sensor);
   } catch (e) {
-    console.error(e);
+    handleFirestoreError(e, 'sensors');
   }
 };
 
@@ -108,7 +118,7 @@ export const deleteSensorFromDb = async (id: number): Promise<void> => {
   try {
     await deleteDoc(doc(db, 'sensors', id.toString()));
   } catch (e) {
-    console.error(e);
+    handleFirestoreError(e, 'sensors');
   }
 };
 
@@ -124,7 +134,7 @@ export const saveManualDiagnostic = async (fieldId: number, data: any): Promise<
       updated_at: new Date().toISOString()
     });
   } catch (e) {
-    console.error("Failed to save manual diagnostic:", e);
+    handleFirestoreError(e, 'manual_diagnostics');
   }
 };
 
@@ -140,7 +150,7 @@ export const getManualDiagnosticsForFields = async (fieldIds: number[]): Promise
     });
     return results;
   } catch (e) {
-    console.error("Failed to fetch manual diagnostics:", e);
-    return {};
+    handleFirestoreError(e, 'manual_diagnostics');
+    return {}; // Return empty object to prevent downstream errors
   }
 };

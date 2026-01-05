@@ -72,7 +72,7 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
           </div>
           <div className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-1">Status</div>
           <div className="text-xl font-bold text-slate-800">Telemetry Active</div>
-          <div className="text-[10px] text-emerald-600 font-bold uppercase mt-1">Shared AI Node Connected</div>
+          <div className="text-[10px] text-emerald-600 font-bold uppercase mt-1">Agricare AI Online</div>
         </div>
       </div>
       
