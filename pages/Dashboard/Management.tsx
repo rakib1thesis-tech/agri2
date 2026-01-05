@@ -17,69 +17,78 @@ const Management: React.FC<{ user: User }> = ({ user }) => {
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      const userFields = await syncFields(user.id);
-      
-      if (userFields.length > 0) {
-        // Fetch current sensor states for all fields
-        const allSensors = await syncSensorsFromDb(userFields);
+      try {
+        const userFields = await syncFields(user.id);
         
-        const initialData: FieldWithAI[] = userFields.map(f => {
-          const fieldSensors = allSensors.filter(s => s.field_id === f.field_id);
+        if (userFields.length > 0) {
+          const allSensors = await syncSensorsFromDb(userFields);
           
-          // Aggregate sensor readings into a unified state for the AI
-          const stats: any = { 
-            temperature: 25.0,
-            moisture: 45.0, 
-            ph_level: 6.5, 
-            npk_n: 50, 
-            npk_p: 40, 
-            npk_k: 60 
-          };
+          const initialData: FieldWithAI[] = userFields.map(f => {
+            const fieldSensors = allSensors.filter(s => s.field_id === f.field_id);
+            
+            // Baseline stats
+            const stats: any = { 
+              temperature: 25.0,
+              moisture: 45.0, 
+              ph_level: 6.5, 
+              npk_n: 50, 
+              npk_p: 40, 
+              npk_k: 60 
+            };
 
-          fieldSensors.forEach(s => {
-            if (!s.last_reading) return;
-            const t = s.sensor_type.toLowerCase();
-            if (t.includes('moisture')) stats.moisture = s.last_reading.value ?? stats.moisture;
-            if (t.includes('temp')) stats.temperature = s.last_reading.value ?? stats.temperature;
-            if (t.includes('ph')) stats.ph_level = s.last_reading.value ?? stats.ph_level;
-            if (t.includes('npk')) { 
-              stats.npk_n = s.last_reading.n ?? stats.npk_n; 
-              stats.npk_p = s.last_reading.p ?? stats.npk_p; 
-              stats.npk_k = s.last_reading.k ?? stats.npk_k; 
+            // Aggregate actual sensor readings, prioritizing the latest state
+            fieldSensors.forEach(s => {
+              if (!s.last_reading) return;
+              const t = s.sensor_type.toLowerCase();
+              if (t.includes('moisture')) stats.moisture = s.last_reading.value ?? stats.moisture;
+              if (t.includes('temp')) stats.temperature = s.last_reading.value ?? stats.temperature;
+              if (t.includes('ph')) stats.ph_level = s.last_reading.value ?? stats.ph_level;
+              if (t.includes('npk')) { 
+                stats.npk_n = s.last_reading.n ?? stats.npk_n; 
+                stats.npk_p = s.last_reading.p ?? stats.npk_p; 
+                stats.npk_k = s.last_reading.k ?? stats.npk_k; 
+              }
+            });
+
+            return {
+              field: f,
+              data: stats,
+              aiLoading: true,
+              irrigation: { needed: false, volume: '...', schedule: '...' },
+              nutrient: { needed: false, fertilizers: [], advice: '...' }
+            };
+          });
+          
+          setFieldData(initialData);
+          setLoading(false);
+
+          // Trigger AI prescriptions for each field
+          initialData.forEach(async (item, index) => {
+            try {
+              const prescriptions = await getManagementPrescriptions(item.field, item.data);
+              setFieldData(prev => {
+                const updated = [...prev];
+                if (updated[index]) {
+                  updated[index] = { ...updated[index], ...prescriptions, aiLoading: false };
+                }
+                return updated;
+              });
+            } catch (err) {
+              console.error(`AI prescription failure for: ${item.field.field_name}`, err);
+              setFieldData(prev => {
+                const updated = [...prev];
+                if (updated[index]) {
+                  updated[index].aiLoading = false;
+                }
+                return updated;
+              });
             }
           });
-
-          return {
-            field: f,
-            data: stats,
-            aiLoading: true,
-            irrigation: { needed: false, volume: '...', schedule: '...' },
-            nutrient: { needed: false, fertilizers: [], advice: '...' }
-          };
-        });
-        
-        setFieldData(initialData);
-        setLoading(false);
-
-        // Batch trigger AI prescriptions
-        initialData.forEach(async (item, index) => {
-          try {
-            const prescriptions = await getManagementPrescriptions(item.field, item.data);
-            setFieldData(prev => {
-              const updated = [...prev];
-              updated[index] = { ...updated[index], ...prescriptions, aiLoading: false };
-              return updated;
-            });
-          } catch (err) {
-            console.error(`AI sync failed for field ${item.field.field_id}`, err);
-            setFieldData(prev => {
-              const updated = [...prev];
-              updated[index].aiLoading = false;
-              return updated;
-            });
-          }
-        });
-      } else {
+        } else {
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error("Dashboard synchronization error:", err);
         setLoading(false);
       }
     };
@@ -132,7 +141,7 @@ const Management: React.FC<{ user: User }> = ({ user }) => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `Agricare_Advisory_Report_${now.toISOString().split('T')[0]}.txt`);
+    link.setAttribute('download', `Agricare_Report_${now.toISOString().split('T')[0]}.txt`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
@@ -154,9 +163,9 @@ const Management: React.FC<{ user: User }> = ({ user }) => {
           </h2>
           
           {loading ? (
-            <div className="py-20 text-center bg-white rounded-[2.5rem] border border-slate-100">
+            <div className="py-20 text-center bg-white rounded-[2.5rem] border border-slate-100 shadow-sm">
                <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-               <p className="text-slate-400 font-medium">Synchronizing Intelligence Nodes...</p>
+               <p className="text-slate-400 font-medium">Synchronizing Field States...</p>
             </div>
           ) : fieldData.length > 0 ? fieldData.map((item) => {
             const { field, data, irrigation, nutrient, aiLoading } = item;
@@ -170,7 +179,7 @@ const Management: React.FC<{ user: User }> = ({ user }) => {
                   </div>
                   {aiLoading ? (
                     <div className="flex items-center gap-2 text-[10px] font-black uppercase text-emerald-600 animate-pulse">
-                      <i className="fas fa-spinner fa-spin"></i> Processing...
+                      <i className="fas fa-brain fa-spin"></i> Processing...
                     </div>
                   ) : (
                     <div className="text-[10px] bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full font-black uppercase tracking-widest">AI Status: Verified</div>
@@ -179,7 +188,7 @@ const Management: React.FC<{ user: User }> = ({ user }) => {
                 
                 <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
                   {/* Irrigation Card */}
-                  <div className={`p-6 rounded-[2rem] border transition-all ${irrigation.needed ? 'bg-blue-50 border-blue-100' : 'bg-slate-50 border-slate-50 opacity-60'}`}>
+                  <div className={`p-6 rounded-[2rem] border transition-all ${irrigation.needed ? 'bg-blue-50 border-blue-100 shadow-inner' : 'bg-slate-50 border-slate-50 opacity-60'}`}>
                     <div className="flex items-center gap-3 mb-4">
                       <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${irrigation.needed ? 'bg-blue-500 text-white shadow-lg shadow-blue-100' : 'bg-slate-200 text-slate-400'}`}>
                         <i className="fas fa-droplet text-lg"></i>
@@ -203,7 +212,7 @@ const Management: React.FC<{ user: User }> = ({ user }) => {
                   </div>
 
                   {/* Nutrient Cycle Card */}
-                  <div className={`p-6 rounded-[2rem] border transition-all ${nutrient.needed ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-50 border-slate-50 opacity-60'}`}>
+                  <div className={`p-6 rounded-[2rem] border transition-all ${nutrient.needed ? 'bg-emerald-50 border-emerald-100 shadow-inner' : 'bg-slate-50 border-slate-50 opacity-60'}`}>
                     <div className="flex items-center gap-3 mb-4">
                       <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${nutrient.needed ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-100' : 'bg-slate-200 text-slate-400'}`}>
                         <i className="fas fa-vial text-lg"></i>
