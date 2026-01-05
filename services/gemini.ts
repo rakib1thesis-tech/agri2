@@ -3,30 +3,45 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { Field } from "../types";
 
 /**
- * The API key is injected automatically by the environment into process.env.API_KEY.
+ * Robust JSON extraction helper.
+ * Strips Markdown code blocks and whitespace often returned by Gemini.
+ */
+const extractJson = (text: string) => {
+  try {
+    const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    return JSON.parse(cleanText);
+  } catch (e) {
+    console.error("Failed to parse AI JSON response:", text);
+    return null;
+  }
+};
+
+/**
+ * The API key is obtained from process.env.API_KEY.
  */
 const getAIClient = () => {
   const apiKey = process.env.API_KEY;
-  if (!apiKey) {
+  if (!apiKey || apiKey === "undefined") {
     throw new Error("API_KEY_NOT_FOUND");
   }
   return new GoogleGenAI({ apiKey });
 };
 
 export const isAiReady = async () => {
-  return !!process.env.API_KEY;
+  const key = process.env.API_KEY;
+  return !!key && key !== "undefined" && key.length > 10;
 };
 
 const formatDataForPrompt = (data: any) => {
   const safeVal = (val: any) => (val != null) ? Number(val).toFixed(2) : "N/A";
   return `
-    FIELD DATA:
-    - Moisture: ${safeVal(data.moisture)}%
-    - pH: ${safeVal(data.ph_level)}
-    - Temp: ${safeVal(data.temperature)}°C
-    - NPK: ${safeVal(data.npk_n)}-${safeVal(data.npk_p)}-${safeVal(data.npk_k)}
+    FIELD TELEMETRY:
+    - Soil Moisture: ${safeVal(data.moisture)}%
+    - pH Balance: ${safeVal(data.ph_level)}
+    - Ambient Temp: ${safeVal(data.temperature)}°C
+    - NPK Profile: N:${safeVal(data.npk_n)} P:${safeVal(data.npk_p)} K:${safeVal(data.npk_k)}
     Location: ${data.location || 'Bangladesh'}
-    Soil: ${data.soil_type || 'Loamy'}
+    Soil Type: ${data.soil_type || 'Loamy'}
   `;
 };
 
@@ -35,7 +50,7 @@ export const getCropAnalysis = async (field: Field, latestData: any) => {
     const ai = getAIClient();
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Recommend 3 crops for ${field.field_name}. ${formatDataForPrompt({...latestData, ...field})}`,
+      contents: `Based on this real-time data, recommend 3 specific crops. Return ONLY a JSON array. ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -54,7 +69,7 @@ export const getCropAnalysis = async (field: Field, latestData: any) => {
         }
       }
     });
-    return JSON.parse(response.text || "[]");
+    return extractJson(response.text || "[]") || [];
   } catch (error) {
     console.error("Crop analysis failed", error);
     return [];
@@ -66,11 +81,14 @@ export const getSoilHealthSummary = async (field: Field, latestData: any) => {
     const ai = getAIClient();
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Evaluate soil health for ${field.field_name}. ${formatDataForPrompt({...latestData, ...field})}. Write 3 sentences.`
+      contents: `Evaluate soil health in 3 concise sentences for ${field.field_name}. Use this data: ${formatDataForPrompt({...latestData, ...field})}`
     });
     return response.text || "Analysis complete.";
-  } catch (error) {
-    return "Analysis engine is initializing. Please verify your shared API_KEY configuration in the environment.";
+  } catch (error: any) {
+    if (error.message === "API_KEY_NOT_FOUND") {
+      return "AI Connection Error: API_KEY is missing from environment. Ensure you have added it to Cloudflare Variables and updated your build command.";
+    }
+    return "The AI node is currently busy. Please refresh the diagnostic link in a few seconds.";
   }
 };
 
@@ -79,7 +97,7 @@ export const getDetailedManagementPlan = async (field: Field, latestData: any) =
     const ai = getAIClient();
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
-      contents: `Provide 4 improvement steps for ${field.field_name}. ${formatDataForPrompt({...latestData, ...field})}`,
+      contents: `Provide 4 prioritized management tasks based on this sensor data. Return ONLY JSON. ${formatDataForPrompt({...latestData, ...field})}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -97,7 +115,7 @@ export const getDetailedManagementPlan = async (field: Field, latestData: any) =
         }
       }
     });
-    return JSON.parse(response.text || "[]");
+    return extractJson(response.text || "[]") || [];
   } catch (error) {
     return [];
   }

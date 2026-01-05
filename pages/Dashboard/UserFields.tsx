@@ -30,7 +30,8 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
 
   useEffect(() => {
     const init = async () => {
-      setAiConnected(await isAiReady());
+      const ready = await isAiReady();
+      setAiConnected(ready);
       const userFields = await syncFields(user.id);
       setFields(userFields);
       if (userFields.length > 0) {
@@ -72,6 +73,10 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       });
       setCurrentDataState(stats);
 
+      // Check connectivity again right before call
+      const ready = await isAiReady();
+      setAiConnected(ready);
+
       const [analysis, summary, plan] = await Promise.all([
         getCropAnalysis(field, stats),
         getSoilHealthSummary(field, stats),
@@ -81,10 +86,9 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       setRecommendations(analysis);
       setAiSummary(summary);
       setManagementPlan(plan);
-      setAiConnected(await isAiReady());
     } catch (err) {
       console.error(err);
-      setAiSummary("Unable to connect to AI engine. Check environment credentials.");
+      setAiSummary("AI Node is currently unreachable. Ensure your shared API_KEY is correctly set in Cloudflare Settings.");
     } finally {
       setLoading(false);
     }
@@ -111,7 +115,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       <div className="flex justify-between items-center mb-12">
         <div>
           <h1 className="text-3xl font-black text-slate-900">Field Command Center</h1>
-          <p className="text-slate-500 text-sm mt-1">AI-driven diagnostics from live sensor telemetry.</p>
+          <p className="text-slate-500 text-sm mt-1">Real-time analysis using manual diagnostics and sensor telemetry.</p>
         </div>
         <button 
           onClick={() => setShowAddFieldModal(true)} 
@@ -174,19 +178,19 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                   </div>
                   
                   <div className="bg-white/5 backdrop-blur-xl p-6 rounded-[2.5rem] border border-white/10 flex flex-wrap gap-6 items-center">
-                    <div className={`flex items-center gap-3 text-sm font-bold ${currentDataState?.moisture ? 'text-emerald-400' : 'text-slate-600'}`}>
-                      <i className={`fas ${currentDataState?.moisture ? 'fa-check-circle' : 'fa-circle-xmark opacity-20'}`}></i>
-                      <span>MOISTURE {currentDataState?.moisture ? `(${currentDataState.moisture}%)` : 'OFFLINE'}</span>
+                    <div className={`flex items-center gap-3 text-sm font-bold ${currentDataState?.moisture != null ? 'text-emerald-400' : 'text-slate-600'}`}>
+                      <i className={`fas ${currentDataState?.moisture != null ? 'fa-check-circle' : 'fa-circle-xmark opacity-20'}`}></i>
+                      <span>MOISTURE {currentDataState?.moisture != null ? `(${currentDataState.moisture}%)` : 'OFFLINE'}</span>
                     </div>
                     <div className="w-px h-6 bg-white/10 hidden md:block"></div>
-                    <div className={`flex items-center gap-3 text-sm font-bold ${currentDataState?.ph_level ? 'text-emerald-400' : 'text-slate-600'}`}>
-                      <i className={`fas ${currentDataState?.ph_level ? 'fa-check-circle' : 'fa-circle-xmark opacity-20'}`}></i>
-                      <span>PH {currentDataState?.ph_level ? `(${currentDataState.ph_level})` : 'OFFLINE'}</span>
+                    <div className={`flex items-center gap-3 text-sm font-bold ${currentDataState?.ph_level != null ? 'text-emerald-400' : 'text-slate-600'}`}>
+                      <i className={`fas ${currentDataState?.ph_level != null ? 'fa-check-circle' : 'fa-circle-xmark opacity-20'}`}></i>
+                      <span>PH {currentDataState?.ph_level != null ? `(${currentDataState.ph_level})` : 'OFFLINE'}</span>
                     </div>
                     <div className="w-px h-6 bg-white/10 hidden md:block"></div>
-                    <div className={`flex items-center gap-3 text-sm font-bold ${currentDataState?.npk_n ? 'text-emerald-400' : 'text-slate-600'}`}>
-                      <i className={`fas ${currentDataState?.npk_n ? 'fa-check-circle' : 'fa-circle-xmark opacity-20'}`}></i>
-                      <span>NPK {currentDataState?.npk_n ? 'SYNCED' : 'OFFLINE'}</span>
+                    <div className={`flex items-center gap-3 text-sm font-bold ${currentDataState?.npk_n != null ? 'text-emerald-400' : 'text-slate-600'}`}>
+                      <i className={`fas ${currentDataState?.npk_n != null ? 'fa-check-circle' : 'fa-circle-xmark opacity-20'}`}></i>
+                      <span>NPK {currentDataState?.npk_n != null ? 'SYNCED' : 'OFFLINE'}</span>
                     </div>
                   </div>
                 </div>
@@ -272,7 +276,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                            <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto opacity-20">
                              <i className="fas fa-clipboard-list text-3xl"></i>
                            </div>
-                           <p className="text-slate-400 font-medium text-sm px-6">Establishing management guidelines based on current field data.</p>
+                           <p className="text-slate-400 font-medium text-sm px-6">Measurements required to generate your localized roadmap.</p>
                         </div>
                       )}
                     </div>
