@@ -17,8 +17,6 @@ interface ManagementTask {
   icon: string;
 }
 
-// Removed redundant window.aistudio declaration to fix conflicting type errors
-
 const UserFields: React.FC<{ user: User }> = ({ user }) => {
   const [fields, setFields] = useState<Field[]>([]);
   const [selectedField, setSelectedField] = useState<Field | null>(null);
@@ -36,7 +34,6 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       const userFields = await syncFields(user.id);
       setFields(userFields);
       
-      // Use standard window.aistudio provided by the environment
       const hasKey = await (window as any).aistudio.hasSelectedApiKey();
       setAiActive(hasKey);
 
@@ -48,7 +45,6 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
   }, [user.id]);
 
   const handleActivateAi = async () => {
-    // Use standard window.aistudio provided by the environment
     await (window as any).aistudio.openSelectKey();
     setAiActive(true);
     if (selectedField) {
@@ -85,32 +81,19 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       });
       setCurrentDataState(stats);
 
-      // Fetch AI data only if active
-      // Use standard window.aistudio provided by the environment
+      // Fetch AI data - always fetch to ensure recommendations are shown (fallbacks are in gemini.ts)
       const hasKey = await (window as any).aistudio.hasSelectedApiKey();
       setAiActive(hasKey);
 
-      if (hasKey) {
-        const [analysis, insight, plan] = await Promise.all([
-          getCropAnalysis(field, stats),
-          getSoilHealthSummary(field, stats),
-          getDetailedManagementPlan(field, stats)
-        ]);
-        
-        setRecommendations(analysis);
-        setSoilInsight(insight);
-        setManagementPlan(plan);
-      } else {
-        // Use fallbacks if key is not yet selected but proceed as requested
-        const [analysis, insight, plan] = await Promise.all([
-          getCropAnalysis(field, stats),
-          getSoilHealthSummary(field, stats),
-          getDetailedManagementPlan(field, stats)
-        ]);
-        setRecommendations(analysis);
-        setSoilInsight(insight);
-        setManagementPlan(plan);
-      }
+      const [analysis, insight, plan] = await Promise.all([
+        getCropAnalysis(field, stats),
+        getSoilHealthSummary(field, stats),
+        getDetailedManagementPlan(field, stats)
+      ]);
+      
+      setRecommendations(analysis);
+      setSoilInsight(insight);
+      setManagementPlan(plan);
     } catch (err) {
       console.error("Critical AI error", err);
     } finally {
@@ -139,7 +122,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       <div className="flex justify-between items-center mb-12">
         <div>
           <h1 className="text-3xl font-black text-slate-900">AI Agronomy Hub</h1>
-          <p className="text-slate-500 text-sm mt-1">Real-time soil telemetry synthesized by shared Gemini AI nodes.</p>
+          <p className="text-slate-500 text-sm mt-1">Deep-soil telemetry synthesized by shared Gemini AI nodes.</p>
         </div>
         <div className="flex gap-4">
           {!aiActive && (
@@ -147,14 +130,14 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
               onClick={handleActivateAi}
               className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-800 transition-all shadow-lg active:scale-95"
             >
-              <i className="fas fa-key"></i> Sync Shared API
+              <i className="fas fa-key"></i> Connect Gemini AI
             </button>
           )}
           <button 
             onClick={() => setShowAddFieldModal(true)} 
             className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-emerald-700 transition-all shadow-lg active:scale-95"
           >
-            <i className="fas fa-plus"></i> Add New Field
+            <i className="fas fa-plus"></i> Add New Plot
           </button>
         </div>
       </div>
@@ -193,7 +176,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
               <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-6">
                 <i className="fas fa-microscope text-4xl text-slate-200"></i>
               </div>
-              <h3 className="text-slate-400 font-bold text-xl">Select a field to initiate shared AI diagnostics.</h3>
+              <h3 className="text-slate-400 font-bold text-xl">Select a plot to initiate soil diagnostics.</h3>
             </div>
           ) : (
             <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-700">
@@ -202,9 +185,9 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                 <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-8">
                   <div>
                     <div className="flex items-center gap-3 mb-4">
-                      <div className={`flex items-center gap-2 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${aiActive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-orange-500/20 text-orange-400'}`}>
-                        <i className={`fas ${aiActive ? 'fa-robot' : 'fa-triangle-exclamation'}`}></i>
-                        {aiActive ? 'Shared API Active' : 'AI Node Inactive'}
+                      <div className={`flex items-center gap-2 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${aiActive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700 text-slate-400'}`}>
+                        <i className={`fas ${aiActive ? 'fa-robot' : 'fa-wave-square'}`}></i>
+                        {aiActive ? 'Advanced AI Enabled' : 'Basic Analysis Active'}
                       </div>
                     </div>
                     <h2 className="text-5xl font-black tracking-tight">{selectedField.field_name}</h2>
@@ -224,17 +207,17 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                     <div className="w-px h-6 bg-white/10 hidden md:block"></div>
                     <div className={`flex items-center gap-3 text-sm font-bold ${currentDataState?.npk_n != null ? 'text-emerald-400' : 'text-slate-600'}`}>
                       <i className={`fas ${currentDataState?.npk_n != null ? 'fa-check-circle' : 'fa-circle-xmark opacity-20'}`}></i>
-                      <span>NPK SYNCED</span>
+                      <span>NPK ONLINE</span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {loading ? (
+              {loading && !recommendations ? (
                 <div className="bg-white p-32 text-center rounded-[3rem] border border-slate-100 shadow-sm flex flex-col items-center">
                   <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-8"></div>
-                  <h3 className="text-2xl font-black text-slate-800">Synthesizing Shared Data...</h3>
-                  <p className="text-slate-400 mt-2">Connecting to shared Gemini AI processing node for optimization.</p>
+                  <h3 className="text-2xl font-black text-slate-800">Calculating Field Optimization...</h3>
+                  <p className="text-slate-400 mt-2">Correlating telemetry with regional agricultural models.</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -261,7 +244,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                             </div>
                             <div>
                               <div className="text-[10px] font-black uppercase text-emerald-400 tracking-widest">Recommended Treatment</div>
-                              <div className="font-bold text-lg">{soilInsight?.soil_fertilizer || "Determining ideal soil conditioner..."}</div>
+                              <div className="font-bold text-lg">{soilInsight?.soil_fertilizer || "Determining soil conditioner..."}</div>
                             </div>
                           </div>
                           <i className="fas fa-shield-virus text-emerald-400/20 text-3xl"></i>
@@ -271,7 +254,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                     
                     <div>
                       <h3 className="font-bold text-2xl text-slate-900 mb-8 flex items-center gap-3 px-4">
-                        <i className="fas fa-chart-line text-emerald-600"></i> AI High-Yield Crop Index
+                        <i className="fas fa-chart-line text-emerald-600"></i> AI High-Yield Index
                       </h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {recommendations && recommendations.length > 0 ? (
@@ -310,7 +293,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                           <div className="col-span-full py-20 bg-slate-50 rounded-[3rem] border border-dashed text-center text-slate-300">
                             <i className="fas fa-robot text-4xl mb-4 block opacity-20"></i>
                             <p className="font-bold">Gathering AI analysis...</p>
-                            {!aiActive && <button onClick={handleActivateAi} className="mt-4 text-emerald-600 font-bold hover:underline">Click to Sync Shared API Key</button>}
+                            {!aiActive && <button onClick={handleActivateAi} className="mt-4 text-emerald-600 font-bold hover:underline">Click to Sync Gemini AI</button>}
                           </div>
                         )}
                       </div>
@@ -340,7 +323,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                            <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto opacity-20">
                              <i className="fas fa-clipboard-list text-3xl"></i>
                            </div>
-                           <p className="text-slate-400 font-medium text-sm px-6 italic">Synchronizing your restoration roadmap...</p>
+                           <p className="text-slate-400 font-medium text-sm px-6 italic">Synchronizing restoration roadmap...</p>
                         </div>
                       )}
                     </div>

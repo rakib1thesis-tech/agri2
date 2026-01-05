@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { User, Field } from '../../types';
-import { syncFields, addFieldToDb } from '../../services/db';
+import { syncFields, syncSensorsFromDb, addFieldToDb } from '../../services/db';
 
 const Overview: React.FC<{ user: User }> = ({ user }) => {
   const [fields, setFields] = useState<Field[]>([]);
+  const [sensorCount, setSensorCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showAddFieldModal, setShowAddFieldModal] = useState(false);
   const [newFieldData, setNewFieldData] = useState({ name: '', location: '', size: '', soilType: 'Loamy' });
@@ -13,6 +14,10 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
     const loadData = async () => {
       const userFields = await syncFields(user.id);
       setFields(userFields);
+      if (userFields.length > 0) {
+        const sensors = await syncSensorsFromDb(userFields);
+        setSensorCount(sensors.length);
+      }
       setLoading(false);
     };
     loadData();
@@ -40,12 +45,12 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
         <div>
           <h1 className="text-4xl font-black text-slate-900">Welcome, {user.name}</h1>
-          <p className="text-slate-500 mt-1">Your agricultural monitoring system is live and syncing field telemetry.</p>
+          <p className="text-slate-500 mt-1">Your agricultural monitoring system is live and tracking soil telemetry.</p>
         </div>
         <div className="flex flex-col items-end gap-3">
           <div className="flex items-center gap-3 bg-emerald-50 px-4 py-2 rounded-2xl border border-emerald-100">
             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-            <span className="text-xs font-bold text-emerald-700 uppercase tracking-widest">System Online</span>
+            <span className="text-xs font-bold text-emerald-700 uppercase tracking-widest">Nodes Active</span>
           </div>
           <button 
             onClick={() => setShowAddFieldModal(true)}
@@ -56,10 +61,10 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
         </div>
       </div>
 
-      {/* Stats Section */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+      {/* Stats Section - Clean & Farmer Focused */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
-          <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-6">
+          <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mb-6">
             <i className="fas fa-map-location-dot text-xl"></i>
           </div>
           <div className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-1">Total Fields</div>
@@ -67,18 +72,25 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
         </div>
         
         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
-          <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center mb-6">
-            <i className="fas fa-shield-check text-xl"></i>
+          <div className="w-12 h-12 bg-orange-50 text-orange-600 rounded-2xl flex items-center justify-center mb-6">
+            <i className="fas fa-temperature-half text-xl"></i>
           </div>
-          <div className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-1">Data Security</div>
-          <div className="text-xl font-bold text-slate-800">End-to-End Encrypted</div>
-          <div className="text-[10px] text-slate-400 font-bold uppercase mt-1">Cloud Protected Sync</div>
+          <div className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-1">Avg. Field Temp</div>
+          <div className="text-4xl font-black text-slate-900">28.4°C</div>
+        </div>
+
+        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+          <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-6">
+            <i className="fas fa-microchip text-xl"></i>
+          </div>
+          <div className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-1">Paired Sensors</div>
+          <div className="text-4xl font-black text-slate-900">{sensorCount}</div>
         </div>
       </div>
       
       {/* Field List */}
       <div className="flex justify-between items-center mb-6 px-2">
-        <h3 className="text-2xl font-bold text-slate-900">Your Managed Fields</h3>
+        <h3 className="text-2xl font-bold text-slate-900">Your Managed Plots</h3>
       </div>
 
       {loading ? (
@@ -103,7 +115,7 @@ const Overview: React.FC<{ user: User }> = ({ user }) => {
               </div>
               <div className="pt-6 border-t border-slate-50 flex justify-between items-center">
                 <div className="text-xs font-bold text-slate-900">{f.size} Hectares</div>
-                <div className="text-[10px] text-emerald-600 font-black uppercase tracking-widest">Live Monitoring</div>
+                <div className="text-[10px] text-emerald-600 font-black uppercase tracking-widest">Tracking Live</div>
               </div>
             </div>
           ))}
