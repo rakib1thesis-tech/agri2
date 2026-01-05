@@ -3,47 +3,18 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { Field } from "../types";
 
 /**
- * Safely retrieves the API key from the environment.
- * In a production build, the build tool replaces 'process.env.VITE_API_KEY' 
- * with the actual string value of your key.
+ * The API key is injected automatically by the environment into process.env.API_KEY.
  */
-const getSafeApiKey = () => {
-  try {
-    // 1. Check for standard Vite/React-Scripts build injection
-    if (typeof process !== 'undefined' && process.env) {
-      if (process.env.VITE_API_KEY) return process.env.VITE_API_KEY;
-      if (process.env.API_KEY) return process.env.API_KEY;
-    }
-    
-    // 2. Fallback for environments where process.env is mapped to window
-    const win = window as any;
-    if (win.VITE_API_KEY) return win.VITE_API_KEY;
-    if (win.API_KEY) return win.API_KEY;
-
-    // 3. Last resort: check if the build tool performed a direct string replacement
-    // Note: Some build tools replace "process.env.VAR" with the literal string.
-    const injectedKey = "process.env.VITE_API_KEY";
-    if (injectedKey !== "process.env.VITE_API_KEY" && injectedKey !== "") {
-      return injectedKey;
-    }
-
-    return null;
-  } catch (e) {
-    return null;
-  }
-};
-
-export const isAiReady = async () => {
-  const key = getSafeApiKey();
-  return !!key && key !== "undefined" && key !== "null";
-};
-
 const getAIClient = () => {
-  const apiKey = getSafeApiKey();
-  if (!apiKey || apiKey === "undefined") {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
     throw new Error("API_KEY_NOT_FOUND");
   }
   return new GoogleGenAI({ apiKey });
+};
+
+export const isAiReady = async () => {
+  return !!process.env.API_KEY;
 };
 
 const formatDataForPrompt = (data: any) => {
@@ -85,7 +56,7 @@ export const getCropAnalysis = async (field: Field, latestData: any) => {
     });
     return JSON.parse(response.text || "[]");
   } catch (error) {
-    console.error("AI Crop Analysis failed:", error);
+    console.error("Crop analysis failed", error);
     return [];
   }
 };
@@ -98,11 +69,8 @@ export const getSoilHealthSummary = async (field: Field, latestData: any) => {
       contents: `Evaluate soil health for ${field.field_name}. ${formatDataForPrompt({...latestData, ...field})}. Write 3 sentences.`
     });
     return response.text || "Analysis complete.";
-  } catch (error: any) {
-    if (error.message === "API_KEY_NOT_FOUND") {
-      return "AI OFFLINE: Key not detected in build. Ensure Cloudflare Settings > Variables contains VITE_API_KEY and Build Command uses VITE_API_KEY=$VITE_API_KEY.";
-    }
-    return "Analysis engine is warming up. Please refresh in a moment.";
+  } catch (error) {
+    return "Analysis engine is initializing. Please verify your shared API_KEY configuration in the environment.";
   }
 };
 
@@ -131,7 +99,6 @@ export const getDetailedManagementPlan = async (field: Field, latestData: any) =
     });
     return JSON.parse(response.text || "[]");
   } catch (error) {
-    console.error("AI Management Plan failed:", error);
     return [];
   }
 };

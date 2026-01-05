@@ -30,8 +30,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
 
   useEffect(() => {
     const init = async () => {
-      const ready = await isAiReady();
-      setAiConnected(ready);
+      setAiConnected(await isAiReady());
       const userFields = await syncFields(user.id);
       setFields(userFields);
       if (userFields.length > 0) {
@@ -84,7 +83,8 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       setManagementPlan(plan);
       setAiConnected(await isAiReady());
     } catch (err) {
-      setAiSummary("Cloud connection error. Verify shared API key in host environment.");
+      console.error(err);
+      setAiSummary("Unable to connect to AI engine. Check environment credentials.");
     } finally {
       setLoading(false);
     }
@@ -111,7 +111,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       <div className="flex justify-between items-center mb-12">
         <div>
           <h1 className="text-3xl font-black text-slate-900">Field Command Center</h1>
-          <p className="text-slate-500 text-sm mt-1">Real-time analysis using manual diagnostics and sensor telemetry.</p>
+          <p className="text-slate-500 text-sm mt-1">AI-driven diagnostics from live sensor telemetry.</p>
         </div>
         <button 
           onClick={() => setShowAddFieldModal(true)} 
@@ -166,7 +166,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                     <div className="flex items-center gap-3 mb-4">
                       <div className={`flex items-center gap-2 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${aiConnected ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
                         <i className={`fas ${aiConnected ? 'fa-robot' : 'fa-triangle-exclamation'}`}></i>
-                        {aiConnected ? 'AI Analysis Online' : 'AI Analysis Offline'}
+                        {aiConnected ? 'AI Online' : 'AI Node Connection Error'}
                       </div>
                     </div>
                     <h2 className="text-5xl font-black tracking-tight">{selectedField.field_name}</h2>
@@ -176,17 +176,17 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                   <div className="bg-white/5 backdrop-blur-xl p-6 rounded-[2.5rem] border border-white/10 flex flex-wrap gap-6 items-center">
                     <div className={`flex items-center gap-3 text-sm font-bold ${currentDataState?.moisture ? 'text-emerald-400' : 'text-slate-600'}`}>
                       <i className={`fas ${currentDataState?.moisture ? 'fa-check-circle' : 'fa-circle-xmark opacity-20'}`}></i>
-                      <span>MOISTURE {currentDataState?.moisture ? `(${currentDataState.moisture}%)` : 'MISSING'}</span>
+                      <span>MOISTURE {currentDataState?.moisture ? `(${currentDataState.moisture}%)` : 'OFFLINE'}</span>
                     </div>
                     <div className="w-px h-6 bg-white/10 hidden md:block"></div>
                     <div className={`flex items-center gap-3 text-sm font-bold ${currentDataState?.ph_level ? 'text-emerald-400' : 'text-slate-600'}`}>
                       <i className={`fas ${currentDataState?.ph_level ? 'fa-check-circle' : 'fa-circle-xmark opacity-20'}`}></i>
-                      <span>PH {currentDataState?.ph_level ? `(${currentDataState.ph_level})` : 'MISSING'}</span>
+                      <span>PH {currentDataState?.ph_level ? `(${currentDataState.ph_level})` : 'OFFLINE'}</span>
                     </div>
                     <div className="w-px h-6 bg-white/10 hidden md:block"></div>
                     <div className={`flex items-center gap-3 text-sm font-bold ${currentDataState?.npk_n ? 'text-emerald-400' : 'text-slate-600'}`}>
                       <i className={`fas ${currentDataState?.npk_n ? 'fa-check-circle' : 'fa-circle-xmark opacity-20'}`}></i>
-                      <span>NPK {currentDataState?.npk_n ? 'SYNCED' : 'MISSING'}</span>
+                      <span>NPK {currentDataState?.npk_n ? 'SYNCED' : 'OFFLINE'}</span>
                     </div>
                   </div>
                 </div>
@@ -196,7 +196,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                 <div className="bg-white p-32 text-center rounded-[3rem] border border-slate-100 shadow-sm flex flex-col items-center">
                   <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-8"></div>
                   <h3 className="text-2xl font-black text-slate-800">Synthesizing Cloud Telemetry...</h3>
-                  <p className="text-slate-400 mt-2">Connecting to central AI processing node.</p>
+                  <p className="text-slate-400 mt-2">Connecting to shared Gemini AI processing node.</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -210,18 +210,8 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                       </h3>
                       <div className={`p-8 rounded-[2.5rem] ${!aiConnected ? 'bg-red-50 text-red-700' : 'bg-emerald-50/50 text-slate-700'} border border-emerald-50`}>
                         <p className="text-lg leading-relaxed font-medium">
-                          {aiSummary || (aiConnected ? "Awaiting model response for sensor packets..." : "AI Analysis is currently offline. Please ensure your central VITE_API_KEY is correctly configured.")}
+                          {aiSummary || "Telemetry analysis in progress..."}
                         </p>
-                        {!aiConnected && (
-                          <div className="mt-6 text-sm bg-white/50 p-6 rounded-2xl border border-red-200">
-                            <p className="font-bold mb-2">Instructions to activate AI:</p>
-                            <ol className="list-decimal list-inside space-y-2 text-red-900 font-semibold">
-                              <li>Add <code className="bg-red-100 px-1 rounded">VITE_API_KEY</code> to Cloudflare Pages Variables.</li>
-                              <li>Change build command to: <code className="bg-red-100 px-1 rounded">VITE_API_KEY=$VITE_API_KEY npm run build</code></li>
-                              <li>Retry the deployment.</li>
-                            </ol>
-                          </div>
-                        )}
                       </div>
                     </div>
                     
@@ -251,8 +241,8 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                           ))
                         ) : (
                           <div className="col-span-full py-20 bg-slate-50 rounded-[3rem] border border-dashed text-center text-slate-300">
-                            <i className="fas fa-image text-4xl mb-4 block opacity-20"></i>
-                            <p className="font-bold">No suitability data available for current telemetry.</p>
+                            <i className="fas fa-robot text-4xl mb-4 block opacity-20"></i>
+                            <p className="font-bold">Awaiting AI analysis to determine crop suitability.</p>
                           </div>
                         )}
                       </div>
@@ -282,7 +272,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                            <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto opacity-20">
                              <i className="fas fa-clipboard-list text-3xl"></i>
                            </div>
-                           <p className="text-slate-400 font-medium text-sm px-6">Measurements required to generate your localized roadmap.</p>
+                           <p className="text-slate-400 font-medium text-sm px-6">Establishing management guidelines based on current field data.</p>
                         </div>
                       )}
                     </div>
