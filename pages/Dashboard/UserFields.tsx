@@ -45,9 +45,6 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
   const handleFieldSelect = async (field: Field) => {
     setSelectedField(field);
     setLoading(true);
-    setRecommendations(null);
-    setSoilInsight(null);
-    setManagementPlan(null);
     
     try {
       const fieldSensors = await syncSensorsFromDb([field]);
@@ -77,6 +74,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       const ready = await isAiReady();
       setAiConnected(ready);
 
+      // Fetch AI data
       const [analysis, insight, plan] = await Promise.all([
         getCropAnalysis(field, stats),
         getSoilHealthSummary(field, stats),
@@ -87,11 +85,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       setSoilInsight(insight);
       setManagementPlan(plan);
     } catch (err) {
-      console.error("AI Node Error:", err);
-      setSoilInsight({
-        summary: "Analysis complete. The current metrics indicate stable conditions, but continue monitoring real-time trends for any rapid fluctuations.",
-        soil_fertilizer: "Apply standard organic compost and maintain hydration levels."
-      });
+      console.error("Critical AI error", err);
     } finally {
       setLoading(false);
     }
@@ -118,7 +112,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
       <div className="flex justify-between items-center mb-12">
         <div>
           <h1 className="text-3xl font-black text-slate-900">AI Agronomy Hub</h1>
-          <p className="text-slate-500 text-sm mt-1">Deep soil telemetry synthesized by Gemini AI.</p>
+          <p className="text-slate-500 text-sm mt-1">Real-time soil telemetry synthesized by shared Gemini AI nodes.</p>
         </div>
         <button 
           onClick={() => setShowAddFieldModal(true)} 
@@ -162,7 +156,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
               <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-6">
                 <i className="fas fa-microscope text-4xl text-slate-200"></i>
               </div>
-              <h3 className="text-slate-400 font-bold text-xl">Select a field to initiate AI soil diagnostics.</h3>
+              <h3 className="text-slate-400 font-bold text-xl">Select a field to initiate shared AI diagnostics.</h3>
             </div>
           ) : (
             <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-700">
@@ -173,7 +167,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                     <div className="flex items-center gap-3 mb-4">
                       <div className={`flex items-center gap-2 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${aiConnected ? 'bg-emerald-500/20 text-emerald-400' : 'bg-orange-500/20 text-orange-400'}`}>
                         <i className={`fas ${aiConnected ? 'fa-robot' : 'fa-wave-square'}`}></i>
-                        {aiConnected ? 'AI Node Connected' : 'Processing Local Telemetry'}
+                        {aiConnected ? 'Shared AI Node Active' : 'Offline Node Processing'}
                       </div>
                     </div>
                     <h2 className="text-5xl font-black tracking-tight">{selectedField.field_name}</h2>
@@ -202,8 +196,8 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
               {loading ? (
                 <div className="bg-white p-32 text-center rounded-[3rem] border border-slate-100 shadow-sm flex flex-col items-center">
                   <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mb-8"></div>
-                  <h3 className="text-2xl font-black text-slate-800">Synthesizing Restoration Plan...</h3>
-                  <p className="text-slate-400 mt-2">Connecting to shared Gemini AI processing node.</p>
+                  <h3 className="text-2xl font-black text-slate-800">Synthesizing Shared Data...</h3>
+                  <p className="text-slate-400 mt-2">Connecting to shared Gemini AI processing node for optimization.</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -213,7 +207,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                         <i className="fas fa-flask-vial"></i>
                       </div>
                       <h3 className="font-bold text-2xl text-slate-900 mb-6 flex items-center gap-3">
-                        <i className="fas fa-vial-circle-check text-emerald-600"></i> AI Soil Restoration Strategy
+                        <i className="fas fa-vial-circle-check text-emerald-600"></i> AI Restoration Strategy
                       </h3>
                       
                       <div className="space-y-6">
@@ -229,7 +223,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                               <i className="fas fa-mortar-pestle text-white"></i>
                             </div>
                             <div>
-                              <div className="text-[10px] font-black uppercase text-emerald-400 tracking-widest">Recommended Soil Fertilizer</div>
+                              <div className="text-[10px] font-black uppercase text-emerald-400 tracking-widest">Recommended Treatment</div>
                               <div className="font-bold text-lg">{soilInsight?.soil_fertilizer || "Determining ideal soil conditioner..."}</div>
                             </div>
                           </div>
@@ -240,7 +234,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                     
                     <div>
                       <h3 className="font-bold text-2xl text-slate-900 mb-8 flex items-center gap-3 px-4">
-                        <i className="fas fa-chart-line text-emerald-600"></i> AI High-Yield Crop & Harvest Index
+                        <i className="fas fa-chart-line text-emerald-600"></i> High-Yield Crop Index
                       </h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {recommendations && recommendations.length > 0 ? (
@@ -257,7 +251,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                               </div>
                               <h4 className="font-black text-slate-900 text-xl mb-2">{r.name}</h4>
                               <div className="text-xs font-bold text-slate-400 mb-4 uppercase tracking-wider flex items-center gap-2">
-                                <i className="fas fa-boxes-packing"></i> Harvest Pot: {r.yield}
+                                <i className="fas fa-boxes-packing"></i> Potential: {r.yield}
                               </div>
                               
                               <div className="h-2 w-full bg-slate-100 rounded-full mb-6 overflow-hidden">
@@ -267,7 +261,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                               <div className="space-y-4">
                                 <div className="bg-emerald-600 p-5 rounded-[1.5rem] shadow-lg shadow-emerald-100">
                                   <div className="text-[10px] font-black text-emerald-200 uppercase mb-2 flex items-center gap-2">
-                                    <i className="fas fa-flask"></i> Perfect Fertilizer for this Crop
+                                    <i className="fas fa-flask"></i> Perfect Boost
                                   </div>
                                   <p className="text-xs font-bold text-white leading-relaxed">{r.fertilizer}</p>
                                 </div>
@@ -278,7 +272,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                         ) : (
                           <div className="col-span-full py-20 bg-slate-50 rounded-[3rem] border border-dashed text-center text-slate-300">
                             <i className="fas fa-robot text-4xl mb-4 block opacity-20"></i>
-                            <p className="font-bold">Collecting baseline metrics for harvest analysis.</p>
+                            <p className="font-bold">Syncing AI recommendations...</p>
                           </div>
                         )}
                       </div>
@@ -308,7 +302,7 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                            <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto opacity-20">
                              <i className="fas fa-clipboard-list text-3xl"></i>
                            </div>
-                           <p className="text-slate-400 font-medium text-sm px-6">Establishing your restoration roadmap based on current telemetry.</p>
+                           <p className="text-slate-400 font-medium text-sm px-6">Establishing your restoration roadmap...</p>
                         </div>
                       )}
                     </div>
