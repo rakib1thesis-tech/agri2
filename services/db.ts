@@ -6,12 +6,13 @@ import { User, Field, Sensor } from '../types';
 
 // Configuration for project: agricare-4c725
 const firebaseConfig = {
-  apiKey: "AIzaSyCeyl_T15XCsu0-tbXoXaZ2t7C3oMLjyF8",
-  authDomain: "agricare-4c725.firebaseapp.com",
-  projectId: "agricare-4c725",
-  storageBucket: "agricare-4c725.appspot.com",
-  messagingSenderId: "629410782904",
-  appId: "1:629410782904:web:4d8f43225d8a6b4ad15e4d"
+  apiKey: "AIzaSyBShhXMHmi2JlRPaGXscvyJb0CYdrrfIcY",
+  authDomain: "agricare-a0738.firebaseapp.com",
+  projectId: "agricare-a0738",
+  storageBucket: "agricare-a0738.firebasestorage.app",
+  messagingSenderId: "159524688038",
+  appId: "1:159524688038:web:5a564c735acfe061c9e467",
+  measurementId: "G-BSNSJDDBD1"
 };
 
 const app: FirebaseApp = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
