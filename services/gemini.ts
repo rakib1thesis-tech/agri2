@@ -12,7 +12,7 @@ class RotatingAIProvider {
 
   constructor() {
     this.keys = [
-      (process as any).env.API_KEY || (process as any).env.VITE_GEMINI_API_KEY,
+      (process as any).env.VITE_GEMINI_API_KEY || (process as any).env.API_KEY,
       (process as any).env.API_KEY_2,
       (process as any).env.API_KEY_3
     ].filter(k => k && k.length > 5) as string[];
@@ -20,7 +20,7 @@ class RotatingAIProvider {
 
   private getClient() {
     if (this.keys.length === 0) {
-      throw new Error("No API keys configured. Ensure process.env.API_KEY is defined.");
+      throw new Error("No API keys configured. Ensure environment variables are set.");
     }
     const key = this.keys[this.currentIndex];
     if (!this.instances.has(key)) {
@@ -54,6 +54,7 @@ class RotatingAIProvider {
 
 const aiProvider = new RotatingAIProvider();
 
+// --- Data Interfaces ---
 export interface HarvestIndex {
   score: number;
   status: 'Early' | 'Optimal' | 'Late' | 'Warning';
@@ -72,7 +73,8 @@ export interface ManagementPrescription {
 }
 
 /**
- * RENAMED TO MATCH Sensors.tsx EXPECTATIONS
+ * Harvest Analysis Logic
+ * Satisfies both getHarvestCompatibility (Sensors.tsx) and getHarvestIndex (UserFields.tsx)
  */
 export const getHarvestCompatibility = async (sensorData: any, fieldName: string): Promise<HarvestIndex> => {
   const prompt = `
@@ -80,6 +82,7 @@ export const getHarvestCompatibility = async (sensorData: any, fieldName: string
     ${JSON.stringify(sensorData)}
     
     Calculate a "Harvest Compatibility Index" (0-100).
+    Context: Low moisture (15-30%) and stable NPK often indicate optimal ripeness for local crops.
     Return ONLY valid JSON:
     {
       "score": number,
@@ -92,15 +95,24 @@ export const getHarvestCompatibility = async (sensorData: any, fieldName: string
     const result = await aiProvider.generate({ contents: [{ role: 'user', parts: [{ text: prompt }] }] });
     return JSON.parse(result.response.text());
   } catch (e) {
-    return { score: 0, status: 'Early', recommendation: "Insufficient sensor data for harvest prediction." };
+    return { score: 0, status: 'Early', recommendation: "Awaiting sufficient sensor data for harvest profiling." };
   }
 };
 
-// Also export as getHarvestIndex just in case UserFields.tsx needs that name
+// Alias for compatibility across different components
 export const getHarvestIndex = getHarvestCompatibility;
 
+/**
+ * Crop Suitability Analysis
+ * Generates the dynamic crop cards for the Harvest Compatibility Index section.
+ */
 export const getCropAnalysis = async (sensorData: any): Promise<CropRecommendation[]> => {
-  const prompt = `Based on these sensor readings: ${JSON.stringify(sensorData)}, recommend 3 suitable crops for Bangladesh. Return JSON array of {crop, suitability, reasoning, tips[]}.`;
+  const prompt = `
+    Act as an agronomist. Based on these Bangladesh sensor readings: ${JSON.stringify(sensorData)}, 
+    recommend 3 suitable crops. 
+    Return JSON array of: 
+    { "crop": "string", "suitability": number, "reasoning": "short string", "tips": ["string"] }
+  `;
   try {
     const result = await aiProvider.generate({ contents: [{ role: 'user', parts: [{ text: prompt }] }] });
     return JSON.parse(result.response.text());
@@ -109,18 +121,24 @@ export const getCropAnalysis = async (sensorData: any): Promise<CropRecommendati
   }
 };
 
+/**
+ * Soil Health Diagnostic
+ */
 export const getSoilHealthSummary = async (sensorData: any): Promise<SoilInsight> => {
-  const prompt = `Analyze soil health for: ${JSON.stringify(sensorData)}. Return JSON {summary, health_score, warnings[]}.`;
+  const prompt = `Analyze soil health for: ${JSON.stringify(sensorData)}. Return JSON: { "summary": "string", "health_score": number, "warnings": ["string"] }`;
   try {
     const result = await aiProvider.generate({ contents: [{ role: 'user', parts: [{ text: prompt }] }] });
     return JSON.parse(result.response.text());
   } catch (e) {
-    return { summary: "Analysis unavailable", health_score: 0, warnings: [] };
+    return { summary: "Diagnostic unavailable", health_score: 0, warnings: [] };
   }
 };
 
+/**
+ * Operational Roadmap Generation
+ */
 export const getDetailedManagementPlan = async (sensorData: any): Promise<any[]> => {
-  const prompt = `Create a 3-task prioritized management plan for: ${JSON.stringify(sensorData)}. Return JSON array of {priority, title, description, icon}.`;
+  const prompt = `Create a 3-task prioritized management plan for: ${JSON.stringify(sensorData)}. Return JSON array: { "priority": "HIGH"|"MEDIUM"|"LOW", "title": "string", "description": "string", "icon": "fa-icon-class" }`;
   try {
     const result = await aiProvider.generate({ contents: [{ role: 'user', parts: [{ text: prompt }] }] });
     return JSON.parse(result.response.text());
@@ -129,14 +147,17 @@ export const getDetailedManagementPlan = async (sensorData: any): Promise<any[]>
   }
 };
 
+/**
+ * Precision Management Prescriptions
+ */
 export const getManagementPrescriptions = async (sensorData: any): Promise<ManagementPrescription> => {
-  const prompt = `Provide irrigation/nutrient prescriptions for: ${JSON.stringify(sensorData)}. Return JSON {irrigation, nutrient}.`;
+  const prompt = `Provide irrigation/nutrient prescriptions for: ${JSON.stringify(sensorData)}. Return JSON: { "irrigation": { "needed": boolean, "volume": "string", "schedule": "string" }, "nutrient": { "needed": boolean, "fertilizers": ["string"], "advice": "string" } }`;
   try {
     const result = await aiProvider.generate({ contents: [{ role: 'user', parts: [{ text: prompt }] }] });
     return JSON.parse(result.response.text());
   } catch (e) {
     return {
-      irrigation: { needed: false, volume: "0", schedule: "N/A" },
+      irrigation: { needed: false, volume: "N/A", schedule: "N/A" },
       nutrient: { needed: false, fertilizers: [], advice: "N/A" }
     };
   }
