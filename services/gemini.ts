@@ -1,10 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { CropRecommendation } from "../types";
 
-/**
- * Multi-Key Rotation System
- * Cycles through up to 3 keys from environment variables to manage rate limits.
- */
 class RotatingAIProvider {
   private keys: string[];
   private currentIndex: number = 0;
@@ -19,20 +15,10 @@ class RotatingAIProvider {
   }
 
   private getClient() {
-    if (this.keys.length === 0) {
-      throw new Error("No API keys configured. Ensure environment variables are set.");
-    }
+    if (this.keys.length === 0) throw new Error("No API keys found.");
     const key = this.keys[this.currentIndex];
-    if (!this.instances.has(key)) {
-      this.instances.set(key, new GoogleGenAI(key));
-    }
+    if (!this.instances.has(key)) this.instances.set(key, new GoogleGenAI(key));
     return this.instances.get(key);
-  }
-
-  private rotate() {
-    if (this.keys.length > 1) {
-      this.currentIndex = (this.currentIndex + 1) % this.keys.length;
-    }
   }
 
   async generate(params: any, retries = 2): Promise<any> {
@@ -44,8 +30,7 @@ class RotatingAIProvider {
       });
       return await model.generateContent(params);
     } catch (error: any) {
-      console.error(`AI Provider Error (Key ${this.currentIndex}):`, error.message);
-      this.rotate();
+      this.currentIndex = (this.currentIndex + 1) % this.keys.length;
       if (retries > 0) return this.generate(params, retries - 1);
       throw error;
     }
@@ -54,111 +39,39 @@ class RotatingAIProvider {
 
 const aiProvider = new RotatingAIProvider();
 
-// --- Data Interfaces ---
-export interface HarvestIndex {
-  score: number;
-  status: 'Early' | 'Optimal' | 'Late' | 'Warning';
-  recommendation: string;
-}
+export interface HarvestIndex { score: number; status: 'Early' | 'Optimal' | 'Late' | 'Warning'; recommendation: string; }
+export interface SoilInsight { summary: string; health_score: number; warnings: string[]; }
 
-export interface SoilInsight {
-  summary: string;
-  health_score: number;
-  warnings: string[];
-}
-
-export interface ManagementPrescription {
-  irrigation: { needed: boolean; volume: string; schedule: string };
-  nutrient: { needed: boolean; fertilizers: string[]; advice: string };
-}
-
-/**
- * Harvest Analysis Logic
- * Satisfies both getHarvestCompatibility (Sensors.tsx) and getHarvestIndex (UserFields.tsx)
- */
 export const getHarvestCompatibility = async (sensorData: any, fieldName: string): Promise<HarvestIndex> => {
-  const prompt = `
-    Analyze current field conditions for "${fieldName}" in Bangladesh:
-    ${JSON.stringify(sensorData)}
-    
-    Calculate a "Harvest Compatibility Index" (0-100).
-    Context: Low moisture (15-30%) and stable NPK often indicate optimal ripeness for local crops.
-    Return ONLY valid JSON:
-    {
-      "score": number,
-      "status": "Early" | "Optimal" | "Late" | "Warning",
-      "recommendation": "string"
-    }
-  `;
-
+  const prompt = `Analyze harvest for ${fieldName} in Bangladesh. Sensors: ${JSON.stringify(sensorData)}. Return JSON {score, status, recommendation}`;
   try {
     const result = await aiProvider.generate({ contents: [{ role: 'user', parts: [{ text: prompt }] }] });
     return JSON.parse(result.response.text());
-  } catch (e) {
-    return { score: 0, status: 'Early', recommendation: "Awaiting sufficient sensor data for harvest profiling." };
-  }
+  } catch (e) { return { score: 0, status: 'Early', recommendation: "Awaiting sensor data." }; }
 };
 
-// Alias for compatibility across different components
 export const getHarvestIndex = getHarvestCompatibility;
 
-/**
- * Crop Suitability Analysis
- * Generates the dynamic crop cards for the Harvest Compatibility Index section.
- */
 export const getCropAnalysis = async (sensorData: any): Promise<CropRecommendation[]> => {
-  const prompt = `
-    Act as an agronomist. Based on these Bangladesh sensor readings: ${JSON.stringify(sensorData)}, 
-    recommend 3 suitable crops. 
-    Return JSON array of: 
-    { "crop": "string", "suitability": number, "reasoning": "short string", "tips": ["string"] }
-  `;
+  const prompt = `Based on N: ${sensorData.n}, P: ${sensorData.p}, K: ${sensorData.k} and Moisture: ${sensorData.moisture}%, recommend 3 crops for Bangladesh. Return JSON array [{crop, suitability, reasoning, tips[]}]`;
   try {
     const result = await aiProvider.generate({ contents: [{ role: 'user', parts: [{ text: prompt }] }] });
     return JSON.parse(result.response.text());
-  } catch (e) {
-    return [];
-  }
+  } catch (e) { return []; }
 };
 
-/**
- * Soil Health Diagnostic
- */
 export const getSoilHealthSummary = async (sensorData: any): Promise<SoilInsight> => {
-  const prompt = `Analyze soil health for: ${JSON.stringify(sensorData)}. Return JSON: { "summary": "string", "health_score": number, "warnings": ["string"] }`;
+  const prompt = `Analyze soil health for NPK (${sensorData.n}, ${sensorData.p}, ${sensorData.k}). Return JSON {summary, health_score, warnings[]}`;
   try {
     const result = await aiProvider.generate({ contents: [{ role: 'user', parts: [{ text: prompt }] }] });
     return JSON.parse(result.response.text());
-  } catch (e) {
-    return { summary: "Diagnostic unavailable", health_score: 0, warnings: [] };
-  }
+  } catch (e) { return { summary: "N/A", health_score: 0, warnings: [] }; }
 };
 
-/**
- * Operational Roadmap Generation
- */
 export const getDetailedManagementPlan = async (sensorData: any): Promise<any[]> => {
-  const prompt = `Create a 3-task prioritized management plan for: ${JSON.stringify(sensorData)}. Return JSON array: { "priority": "HIGH"|"MEDIUM"|"LOW", "title": "string", "description": "string", "icon": "fa-icon-class" }`;
+  const prompt = `3 tasks for sensor state: ${JSON.stringify(sensorData)}. Return JSON array [{priority, title, description, icon}]`;
   try {
     const result = await aiProvider.generate({ contents: [{ role: 'user', parts: [{ text: prompt }] }] });
     return JSON.parse(result.response.text());
-  } catch (e) {
-    return [];
-  }
-};
-
-/**
- * Precision Management Prescriptions
- */
-export const getManagementPrescriptions = async (sensorData: any): Promise<ManagementPrescription> => {
-  const prompt = `Provide irrigation/nutrient prescriptions for: ${JSON.stringify(sensorData)}. Return JSON: { "irrigation": { "needed": boolean, "volume": "string", "schedule": "string" }, "nutrient": { "needed": boolean, "fertilizers": ["string"], "advice": "string" } }`;
-  try {
-    const result = await aiProvider.generate({ contents: [{ role: 'user', parts: [{ text: prompt }] }] });
-    return JSON.parse(result.response.text());
-  } catch (e) {
-    return {
-      irrigation: { needed: false, volume: "N/A", schedule: "N/A" },
-      nutrient: { needed: false, fertilizers: [], advice: "N/A" }
-    };
-  }
+  } catch (e) { return []; }
 };
