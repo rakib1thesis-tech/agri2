@@ -33,74 +33,90 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
     setSelectedField(field);
     setLoading(true);
     
-    const allSensors = await syncSensorsFromDb([field]);
-    const fieldSensors = allSensors.filter(s => s.field_id === field.field_id);
-    
-    // Extract individual N, P, K from the NPK sensor
-    const npkSensor = fieldSensors.find(s => s.sensor_type.toLowerCase().includes('npk'));
-    const metrics = {
-      moisture: fieldSensors.find(s => s.sensor_type.toLowerCase().includes('moisture'))?.last_reading?.value,
-      ph: fieldSensors.find(s => s.sensor_type.toLowerCase().includes('ph'))?.last_reading?.value,
-      temp: fieldSensors.find(s => s.sensor_type.toLowerCase().includes('temp'))?.last_reading?.value,
-      n: npkSensor?.last_reading?.npk?.n,
-      p: npkSensor?.last_reading?.npk?.p,
-      k: npkSensor?.last_reading?.npk?.k
-    };
+    try {
+        const allSensors = await syncSensorsFromDb([field]);
+        const fieldSensors = allSensors.filter(s => s.field_id === field.field_id);
+        
+        // FUZZY MATCHING: Finds sensor regardless of exact name (e.g., "pH Level" or "Soil pH")
+        const findS = (key: string) => fieldSensors.find(s => s.sensor_type.toLowerCase().includes(key));
 
-    setSensorValues(metrics);
+        const npkSensor = findS('npk');
+        const metrics = {
+            moisture: findS('moisture')?.last_reading?.value || null,
+            ph: findS('ph')?.last_reading?.value || null,
+            temp: (findS('temp') || findS('temperature'))?.last_reading?.value || null,
+            n: npkSensor?.last_reading?.npk?.n || null,
+            p: npkSensor?.last_reading?.npk?.p || null,
+            k: npkSensor?.last_reading?.npk?.k || null
+        };
 
-    const [hi, crops, soil, plan] = await Promise.all([
-      getHarvestCompatibility(metrics, field.field_name),
-      getCropAnalysis(metrics),
-      getSoilHealthSummary(metrics),
-      getDetailedManagementPlan(metrics)
-    ]);
+        setSensorValues(metrics);
 
-    setHarvestIndex(hi);
-    setRecommendations(crops);
-    setSoilInsight(soil);
-    setManagementPlan(plan);
-    setLoading(false);
+        const [hi, crops, soil, plan] = await Promise.all([
+            getHarvestCompatibility(metrics, field.field_name),
+            getCropAnalysis(metrics),
+            getSoilHealthSummary(metrics),
+            getDetailedManagementPlan(metrics)
+        ]);
+
+        setHarvestIndex(hi);
+        setRecommendations(crops);
+        setSoilInsight(soil);
+        setManagementPlan(plan);
+    } catch (err) {
+        console.error("Selection Error:", err);
+    } finally {
+        setLoading(false);
+    }
   };
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-12">
       <div className="flex flex-col lg:flex-row gap-10">
+        
+        {/* Sidebar */}
         <div className="w-full lg:w-80 space-y-4">
           {fields.map(f => (
-            <div key={f.field_id} onClick={() => handleFieldSelect(f)} className={`p-6 rounded-[2rem] cursor-pointer border-2 ${selectedField?.field_id === f.field_id ? 'border-emerald-500 bg-emerald-50' : 'bg-white border-slate-100'}`}>
+            <div 
+              key={f.field_id} 
+              onClick={() => handleFieldSelect(f)} 
+              className={`p-6 rounded-[2rem] cursor-pointer border-2 transition-all ${
+                selectedField?.field_id === f.field_id ? 'border-emerald-500 bg-emerald-50' : 'bg-white border-slate-100'
+              }`}
+            >
               <h3 className="font-black text-slate-900">{f.field_name}</h3>
-              <p className="text-xs font-bold text-slate-400">{f.location}</p>
+              <p className="text-xs font-bold text-slate-400 uppercase">{f.location}</p>
             </div>
           ))}
         </div>
 
-        <div className="flex-1 space-y-8">
+        {/* Main Content */}
+        <div className="flex-1 space-y-12">
           {selectedField && (
             <>
-              {/* RESTORED SENSOR HEADER */}
-              <div className="bg-slate-900 rounded-[3.5rem] p-10 text-white shadow-2xl">
+              {/* SENSOR HEADER: Restored to original NPK/PH/Temp view */}
+              <div className="bg-slate-900 rounded-[3.5rem] p-10 text-white shadow-2xl relative overflow-hidden">
                 <div className="flex justify-between items-center mb-10">
                     <div>
                         <h2 className="text-6xl font-black">{selectedField.field_name}</h2>
                         <p className="text-slate-400 font-bold">{selectedField.location} • {selectedField.size} ha</p>
                     </div>
-                    <button className="bg-emerald-500/10 text-emerald-400 px-6 py-2 rounded-full text-xs font-black uppercase tracking-widest border border-emerald-500/20">
+                    <div className="bg-emerald-500/10 text-emerald-400 px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border border-emerald-500/20">
                         ⚡ Live AI Stream
-                    </button>
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {[
-                    { label: 'Moisture', val: sensorValues.moisture ? `${sensorValues.moisture}%` : 'Required', icon: 'fa-droplet' },
-                    { label: 'pH Level', val: sensorValues.ph || 'Required', icon: 'fa-scale-balanced' },
-                    { label: 'Temperature', val: sensorValues.temp ? `${sensorValues.temp}°C` : 'Required', icon: 'fa-temperature-high' },
-                    { label: 'NPK Balance', val: sensorValues.n ? `N:${sensorValues.n} P:${sensorValues.p} K:${sensorValues.k}` : 'Required', icon: 'fa-flask' }
+                    { label: 'Moisture', val: sensorValues.moisture ? `${sensorValues.moisture}%` : 'Sensor Required', icon: 'fa-droplet' },
+                    { label: 'pH Level', val: sensorValues.ph || 'Sensor Required', icon: 'fa-scale-balanced' },
+                    { label: 'Temperature', val: sensorValues.temp ? `${sensorValues.temp}°C` : 'Sensor Required', icon: 'fa-temperature-high' },
+                    { label: 'NPK Balance', val: sensorValues.n !== null ? `N:${sensorValues.n} P:${sensorValues.p} K:${sensorValues.k}` : 'Sensor Required', icon: 'fa-flask' }
                   ].map((s, i) => (
                     <div key={i} className="bg-white/5 border border-white/10 p-6 rounded-[2rem]">
                       <div className="flex items-center gap-3 mb-2 opacity-40">
-                        <i className={`fas ${s.icon} text-xs`}></i>
-                        <span className="text-[10px] font-black uppercase tracking-tighter">{s.label}</span>
+                        <i className={`fas ${s.icon} text-xs text-emerald-400`}></i>
+                        <span className="text-[10px] font-black uppercase tracking-widest">{s.label}</span>
                       </div>
                       <p className="text-sm font-black text-emerald-400">{s.val}</p>
                     </div>
@@ -108,31 +124,42 @@ const UserFields: React.FC<{ user: User }> = ({ user }) => {
                 </div>
               </div>
 
-              {/* DYNAMIC HARVEST COMPATIBILITY CARDS */}
-              <div className="space-y-6">
-                <h3 className="text-xl font-black text-slate-900 flex items-center gap-2">
+              {/* Dynamic Crop Cards */}
+              <div className="space-y-8">
+                <h3 className="text-2xl font-black text-slate-900 flex items-center gap-3">
                     <i className="fas fa-leaf text-emerald-500"></i> Harvest Compatibility Index
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {recommendations?.map((crop, idx) => (
-                    <div key={idx} className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm">
-                      <div className="flex justify-between mb-6">
-                        <div className="w-12 h-12 bg-emerald-50 rounded-full flex items-center justify-center">
-                          <i className="fas fa-seedling text-emerald-600"></i>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Match</p>
-                          <p className="text-2xl font-black">{crop.suitability}%</p>
-                        </div>
-                      </div>
-                      <h4 className="text-xl font-black mb-4">{crop.crop}</h4>
-                      <div className="bg-emerald-600 text-white p-3 rounded-2xl text-[10px] font-bold uppercase mb-4 text-center">
-                        Optimal Supplement: {crop.tips[0]}
-                      </div>
-                      <p className="text-xs italic text-slate-400">"{crop.reasoning}"</p>
+                
+                {loading ? (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-pulse">
+                        {[1,2,3].map(i => <div key={i} className="h-64 bg-slate-100 rounded-[3rem]"></div>)}
                     </div>
-                  ))}
-                </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {recommendations?.map((crop, idx) => (
+                            <div key={idx} className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm hover:shadow-xl transition-all">
+                                <div className="flex justify-between items-start mb-6">
+                                    <div className="w-14 h-14 bg-emerald-50 rounded-full flex items-center justify-center">
+                                        <i className="fas fa-seedling text-emerald-600"></i>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-[10px] font-black text-slate-400 uppercase">Match</p>
+                                        <p className="text-3xl font-black text-slate-900">{crop.suitability}%</p>
+                                    </div>
+                                </div>
+                                <h4 className="text-2xl font-black text-slate-900 mb-4">{crop.crop}</h4>
+                                <div className="bg-emerald-600 text-white p-4 rounded-2xl flex items-center gap-3 mb-6">
+                                    <i className="fas fa-flask-vial text-sm"></i>
+                                    <div>
+                                        <p className="text-[8px] font-black uppercase opacity-70 tracking-widest">Supplement</p>
+                                        <p className="text-xs font-bold uppercase">{crop.tips[0] || 'NPK Sync'}</p>
+                                    </div>
+                                </div>
+                                <p className="text-xs italic text-slate-400 leading-relaxed font-medium">"{crop.reasoning}"</p>
+                            </div>
+                        ))}
+                    </div>
+                )}
               </div>
             </>
           )}
