@@ -282,13 +282,31 @@ export const getDetailedManagementPlan = async (field: Field, latestData: any) =
 
 // --- DYNAMIC DATA-AWARE FALLBACKS ---
 
-const getFallbackCrops = (data: any): CropRecommendation[] => {
-  const isDry = data.moisture !== undefined && data.moisture < 20;
-  return [
-    { name: isDry ? "Millets" : "Hybrid Rice", suitability: 90, yield: isDry ? "2.0t/ha" : "7.5t/ha", requirements: "Resilient to current profile.", fertilizer: "Urea", icon: "fa-wheat-awn" },
-    { name: "Potato", suitability: 82, yield: "22t/ha", requirements: "Needs loose soil.", fertilizer: "MOP", icon: "fa-potato" },
-    { name: "Eggplant", suitability: 75, yield: "18t/ha", requirements: "High Nitrogen needs.", fertilizer: "Organic", icon: "fa-seedling" }
-  ];
+export const getHarvestIndex = async (sensorData: any, fieldName: string): Promise<HarvestIndex> => {
+  const prompt = `
+    Analyze current field conditions for "${fieldName}" in Bangladesh:
+    ${JSON.stringify(sensorData)}
+    
+    Calculate a "Harvest Compatibility Index" (0-100).
+    Context: 
+    - Low soil moisture (15-30%) combined with stable NPK usually indicates optimal ripeness for delta crops like Potatoes or Rice.
+    - High moisture (>60%) suggests the crop is still in growth phase (Early).
+    - Extreme heat (>35°C) with low moisture might trigger a "Warning" for heat stress rather than harvest.
+
+    Return ONLY valid JSON:
+    {
+      "score": number,
+      "status": "Early" | "Optimal" | "Late" | "Warning",
+      "recommendation": "string"
+    }
+  `;
+
+  try {
+    const result = await aiProvider.generate({ contents: [{ role: 'user', parts: [{ text: prompt }] }] });
+    return JSON.parse(result.response.text());
+  } catch (e) {
+    return { score: 0, status: 'Early', recommendation: "Insufficient sensor data for harvest prediction." };
+  }
 };
 
 const getFallbackSoilInsight = (data: any): SoilInsight => {
